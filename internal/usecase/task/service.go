@@ -28,13 +28,29 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 	}
 
 	model := &taskdomain.Task{
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
+		Title:            normalized.Title,
+		Description:      normalized.Description,
+		Status:           normalized.Status,
+		RecurrenceType:   normalized.RecurrenceType,
+		RecurrenceEveryN: normalized.RecurrenceEveryN,
+		MonthlyDay:       normalized.MonthlyDay,
+		SpecificDates:    normalized.SpecificDates,
+		EvenOdd:          normalized.EvenOdd,
 	}
+
+	// ВАЖНО: Валидируем периодичность перед сохранением
+	if err := model.ValidateRecurrence(); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+	}
+
 	now := s.now()
 	model.CreatedAt = now
 	model.UpdatedAt = now
+
+	// Устанавливаем статус по умолчанию, если не указан
+	if model.Status == "" {
+		model.Status = taskdomain.StatusNew
+	}
 
 	created, err := s.repo.Create(ctx, model)
 	if err != nil {
@@ -57,20 +73,45 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
 	}
 
+	// Сначала получаем существующую задачу
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
 	normalized, err := validateUpdateInput(input)
 	if err != nil {
 		return nil, err
 	}
 
-	model := &taskdomain.Task{
-		ID:          id,
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
-		UpdatedAt:   s.now(),
+	// Обновляем только те поля, которые переданы
+	if normalized.Title != nil {
+		existing.Title = *normalized.Title
+	}
+	if normalized.Description != nil {
+		existing.Description = *normalized.Description
+	}
+	if normalized.Status != nil && normalized.Status.Valid() {
+		existing.Status = *normalized.Status
 	}
 
-	updated, err := s.repo.Update(ctx, model)
+	// Обновляем поля периодичности, если они переданы
+	if normalized.RecurrenceType != nil {
+		existing.RecurrenceType = *normalized.RecurrenceType
+		existing.RecurrenceEveryN = normalized.RecurrenceEveryN
+		existing.MonthlyDay = normalized.MonthlyDay
+		existing.SpecificDates = normalized.SpecificDates
+		existing.EvenOdd = normalized.EvenOdd
+
+		// Валидируем обновленную периодичность
+		if err := existing.ValidateRecurrence(); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+		}
+	}
+
+	existing.UpdatedAt = s.now()
+
+	updated, err := s.repo.Update(ctx, existing)
 	if err != nil {
 		return nil, err
 	}
@@ -110,14 +151,23 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 }
 
 func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
-	input.Title = strings.TrimSpace(input.Title)
-	input.Description = strings.TrimSpace(input.Description)
-
-	if input.Title == "" {
-		return UpdateInput{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
+	// Обработка Title (указатель)
+	if input.Title != nil {
+		trimmed := strings.TrimSpace(*input.Title)
+		if trimmed == "" {
+			return UpdateInput{}, fmt.Errorf("%w: title cannot be empty", ErrInvalidInput)
+		}
+		input.Title = &trimmed
 	}
 
-	if !input.Status.Valid() {
+	// Обработка Description (указатель)
+	if input.Description != nil {
+		trimmed := strings.TrimSpace(*input.Description)
+		input.Description = &trimmed
+	}
+
+	// Валидация статуса (указатель)
+	if input.Status != nil && !input.Status.Valid() {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
