@@ -37,9 +37,25 @@ func (r *Repository) Create(ctx context.Context, task *taskdomain.Task) (*taskdo
 		tmp := task.RecurrenceStartDate.Time
 		t = &tmp
 	}
-	row := r.pool.QueryRow(ctx, query, task.Title, task.Description, task.Status, task.CreatedAt, task.UpdatedAt, task.RecurrenceType, payload, t)
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	row := tx.QueryRow(ctx, query, task.Title, task.Description, task.Status, task.CreatedAt, task.UpdatedAt, task.RecurrenceType, payload, t)
 	created, err := scanTask(row)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := replaceSpecificDates(ctx, tx, created.ID, created.RecurrenceType, created.RecurrencePayload); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +105,15 @@ func (r *Repository) Update(ctx context.Context, task *taskdomain.Task) (*taskdo
 		tmp := task.RecurrenceStartDate.Time
 		t = &tmp
 	}
-	row := r.pool.QueryRow(ctx, query, task.Title, task.Description, task.Status, task.UpdatedAt, task.RecurrenceType, payload, t, task.ID)
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	row := tx.QueryRow(ctx, query, task.Title, task.Description, task.Status, task.UpdatedAt, task.RecurrenceType, payload, t, task.ID)
 
 	updated, err := scanTask(row)
 	if err != nil {
@@ -97,6 +121,14 @@ func (r *Repository) Update(ctx context.Context, task *taskdomain.Task) (*taskdo
 			return nil, taskdomain.ErrNotFound
 		}
 
+		return nil, err
+	}
+
+	if err := replaceSpecificDates(ctx, tx, updated.ID, updated.RecurrenceType, updated.RecurrencePayload); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -271,4 +303,29 @@ func scanTask(scanner taskScanner) (*taskdomain.Task, error) {
 	task.Status = taskdomain.Status(status)
 
 	return &task, nil
+}
+
+func replaceSpecificDates(ctx context.Context, tx pgx.Tx, taskID int64, recType recurrence.RecurrenceType, payload recurrence.RecurrencePayload) error {
+	_, err := tx.Exec(ctx, "DELETE FROM task_specific_dates WHERE task_id = $1", taskID)
+	if err != nil {
+		return err
+	}
+
+	if recType != recurrence.SpecificDates {
+		return nil
+	}
+
+	dateStrings := make([]string, 0, len(payload.SpecificDates))
+	for _, d := range payload.SpecificDates {
+		normalized := common.NewDate(d.Time.UTC()).Time
+		dateStrings = append(dateStrings, normalized.Format(common.DateLayout))
+	}
+
+	_, err = tx.Exec(ctx, `
+        INSERT INTO task_specific_dates (task_id, date)
+        SELECT $1, x::date
+        FROM unnest($2::text[]) AS x
+        ON CONFLICT DO NOTHING`, taskID, dateStrings)
+
+	return err
 }
