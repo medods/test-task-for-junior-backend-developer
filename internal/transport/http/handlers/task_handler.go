@@ -140,32 +140,6 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
-func (h *TaskHandler) ListByDate(w http.ResponseWriter, r *http.Request) {
-	requestDate := r.URL.Query().Get("date")
-	var normalizedDate common.DateType
-	if requestDate != "" {
-		err := normalizedDate.UnmarshalJSON([]byte(requestDate))
-		if err != nil {
-			writeError(w, http.StatusBadRequest, err)
-		}
-	} else {
-		normalizedDate = common.NewDate(time.Now())
-	}
-
-	tasks, err := h.usecase.ListByDate(r.Context(), normalizedDate.Time)
-	if err != nil {
-		writeUsecaseError(w, err)
-		return
-	}
-
-	response := make([]taskDTO, 0, len(tasks))
-	for i := range tasks {
-		response = append(response, newTaskDTO(&tasks[i]))
-	}
-
-	writeJSON(w, http.StatusOK, response)
-}
-
 func getIDFromRequest(r *http.Request) (int64, error) {
 	rawID := mux.Vars(r)["id"]
 	if rawID == "" {
