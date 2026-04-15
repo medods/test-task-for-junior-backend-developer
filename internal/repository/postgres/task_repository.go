@@ -150,41 +150,44 @@ func (r *Repository) List(ctx context.Context) ([]taskdomain.Task, error) {
 
 func (r *Repository) ListByDate(ctx context.Context, date time.Time) ([]taskdomain.Task, error) {
 	const query = `
-		SELECT id, title, description, status, created_at, updated_at, recurrence_type, recurrence_payload, recurrence_start_date
-		FROM tasks
-		WHERE 
-		(recurrence_type = 'none' AND recurrence_start_date = $1::date)
-		OR
-		(recurrence_type = 'daily_every_n'
-		 AND recurrence_start_date IS NOT NULL
-		 AND $1::date >= recurrence_start_date
-		 AND (recurrence_payload->>'interval_days') IS NOT NULL
-		 AND ((($1::date - recurrence_start_date) % ((recurrence_payload->>'interval_days')::int)) = 0)
-		)
-		OR
-		(recurrence_type = 'monthly_day'
-		 AND (recurrence_payload->>'month_day') IS NOT NULL
-		 AND date_part('day', $1::date)::int = (recurrence_payload->>'month_day')::int
-		 AND $1::date >= recurrence_start_date
-		)
-		OR
-		(recurrence_type = 'specific_dates'
-		 AND EXISTS (
-			SELECT 1 FROM jsonb_array_elements_text(recurrence_payload->'specific_dates') AS sd(d)
-			WHERE sd.d = to_char($1::date, 'YYYY-MM-DD')
-		)
-		)
-		OR
-		(recurrence_type = 'month_parity'
-		 AND (recurrence_payload->>'parity') IS NOT NULL
-		 AND (
-			((recurrence_payload->>'parity') = 'even' AND (date_part('day', $1::date)::int % 2) = 0)
-			OR
-			((recurrence_payload->>'parity') = 'odd' AND (date_part('day', $1::date)::int % 2) = 1)
-		)
-		AND $1::date >= recurrence_start_date
-		);
-	`
+    SELECT id, title, description, status, created_at, updated_at, recurrence_type, recurrence_payload, recurrence_start_date
+    FROM tasks
+    WHERE
+      (recurrence_type = 'none' AND recurrence_start_date = $1::date)
+      OR
+      (
+        recurrence_type = 'daily_every_n'
+        AND recurrence_start_date IS NOT NULL
+        AND $1::date >= recurrence_start_date
+        AND (recurrence_payload->>'interval_days') IS NOT NULL
+        AND ((recurrence_payload->>'interval_days')::int > 0)
+        AND ((($1::date - recurrence_start_date) % ((recurrence_payload->>'interval_days')::int)) = 0)
+      )
+      OR
+      (
+        recurrence_type = 'monthly_day'
+        AND (recurrence_payload->>'month_day') IS NOT NULL
+        AND ((recurrence_payload->>'month_day')::int BETWEEN 1 AND 30)
+        AND date_part('day', $1::date)::int = (recurrence_payload->>'month_day')::int
+        AND $1::date >= recurrence_start_date
+      )
+      OR
+      (
+        recurrence_type = 'specific_dates'
+        AND (recurrence_payload->'specific_dates') ? to_char($1::date, 'YYYY-MM-DD')
+      )
+      OR
+      (
+        recurrence_type = 'month_parity'
+        AND (recurrence_payload->>'parity') IN ('even','odd')
+        AND (
+          ((recurrence_payload->>'parity') = 'even' AND (date_part('day', $1::date)::int % 2) = 0)
+          OR
+          ((recurrence_payload->>'parity') = 'odd' AND (date_part('day', $1::date)::int % 2) = 1)
+        )
+        AND $1::date >= recurrence_start_date
+      );
+    `
 
 	normalized := common.NewDate(date.UTC()).Time
 
