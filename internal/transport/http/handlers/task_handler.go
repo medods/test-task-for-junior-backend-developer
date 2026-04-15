@@ -3,12 +3,15 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 
-	taskdomain "example.com/taskservice/internal/domain/task"
+	"example.com/taskservice/internal/domain/common"
+	task "example.com/taskservice/internal/domain/task"
 	taskusecase "example.com/taskservice/internal/usecase/task"
 )
 
@@ -28,9 +31,12 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:               req.Title,
+		Description:         req.Description,
+		Status:              req.Status,
+		RecurrenceType:      req.RecurrenceType,
+		RecurrencePayload:   req.RecurrencePayload,
+		RecurrenceStartDate: req.RecurrenceStartDate,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -70,9 +76,12 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:               req.Title,
+		Description:         req.Description,
+		Status:              req.Status,
+		RecurrenceType:      req.RecurrenceType,
+		RecurrencePayload:   req.RecurrencePayload,
+		RecurrenceStartDate: req.RecurrenceStartDate,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -98,7 +107,52 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.usecase.List(r.Context())
+	requestDate := r.URL.Query().Get("date")
+	tasks := make([]task.Task, 0)
+	var err error
+
+	if requestDate != "" {
+		parsed, err := time.Parse(common.DateLayout, requestDate)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid date, expected YYYY-MM-DD"))
+			return
+		}
+
+		normalized := common.NewDate(parsed.UTC())
+		tasks, err = h.usecase.ListByDate(r.Context(), normalized.Time)
+		if err != nil {
+			writeUsecaseError(w, err)
+			return
+		}
+	} else {
+		tasks, err = h.usecase.List(r.Context())
+		if err != nil {
+			writeUsecaseError(w, err)
+			return
+		}
+	}
+
+	response := make([]taskDTO, 0, len(tasks))
+	for i := range tasks {
+		response = append(response, newTaskDTO(&tasks[i]))
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (h *TaskHandler) ListByDate(w http.ResponseWriter, r *http.Request) {
+	requestDate := r.URL.Query().Get("date")
+	var normalizedDate common.DateType
+	if requestDate != "" {
+		err := normalizedDate.UnmarshalJSON([]byte(requestDate))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+		}
+	} else {
+		normalizedDate = common.NewDate(time.Now())
+	}
+
+	tasks, err := h.usecase.ListByDate(r.Context(), normalizedDate.Time)
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
@@ -143,7 +197,7 @@ func decodeJSON(r *http.Request, dst any) error {
 
 func writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, taskdomain.ErrNotFound):
+	case errors.Is(err, task.ErrNotFound):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, taskusecase.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err)

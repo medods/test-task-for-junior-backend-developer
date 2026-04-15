@@ -1,3 +1,4 @@
+// Package task
 package task
 
 import (
@@ -6,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	taskdomain "example.com/taskservice/internal/domain/task"
+	"example.com/taskservice/internal/domain/recurrence"
+	task "example.com/taskservice/internal/domain/task"
 )
 
 type Service struct {
@@ -21,16 +23,19 @@ func NewService(repo Repository) *Service {
 	}
 }
 
-func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Task, error) {
+func (s *Service) Create(ctx context.Context, input CreateInput) (*task.Task, error) {
 	normalized, err := validateCreateInput(input)
 	if err != nil {
 		return nil, err
 	}
 
-	model := &taskdomain.Task{
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
+	model := &task.Task{
+		Title:               normalized.Title,
+		Description:         normalized.Description,
+		Status:              normalized.Status,
+		RecurrenceType:      normalized.RecurrenceType,
+		RecurrencePayload:   normalized.RecurrencePayload,
+		RecurrenceStartDate: normalized.RecurrenceStartDate,
 	}
 	now := s.now()
 	model.CreatedAt = now
@@ -44,7 +49,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 	return created, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, id int64) (*taskdomain.Task, error) {
+func (s *Service) GetByID(ctx context.Context, id int64) (*task.Task, error) {
 	if id <= 0 {
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
 	}
@@ -52,7 +57,7 @@ func (s *Service) GetByID(ctx context.Context, id int64) (*taskdomain.Task, erro
 	return s.repo.GetByID(ctx, id)
 }
 
-func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*taskdomain.Task, error) {
+func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*task.Task, error) {
 	if id <= 0 {
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
 	}
@@ -62,12 +67,15 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		return nil, err
 	}
 
-	model := &taskdomain.Task{
-		ID:          id,
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
-		UpdatedAt:   s.now(),
+	model := &task.Task{
+		ID:                  id,
+		Title:               normalized.Title,
+		Description:         normalized.Description,
+		Status:              normalized.Status,
+		RecurrenceType:      normalized.RecurrenceType,
+		RecurrencePayload:   normalized.RecurrencePayload,
+		RecurrenceStartDate: normalized.RecurrenceStartDate,
+		UpdatedAt:           s.now(),
 	}
 
 	updated, err := s.repo.Update(ctx, model)
@@ -86,8 +94,12 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context) ([]taskdomain.Task, error) {
+func (s *Service) List(ctx context.Context) ([]task.Task, error) {
 	return s.repo.List(ctx)
+}
+
+func (s *Service) ListByDate(ctx context.Context, date time.Time) ([]task.Task, error) {
+	return s.repo.ListByDate(ctx, date)
 }
 
 func validateCreateInput(input CreateInput) (CreateInput, error) {
@@ -99,11 +111,15 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 	}
 
 	if input.Status == "" {
-		input.Status = taskdomain.StatusNew
+		input.Status = task.StatusNew
 	}
 
 	if !input.Status.Valid() {
 		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
+	}
+
+	if input.RecurrenceType != recurrence.NoneRecurrence && input.RecurrenceStartDate == nil {
+		return CreateInput{}, fmt.Errorf("%w: invalid_recurrence type or recurrence_start_date", ErrInvalidInput)
 	}
 
 	return input, nil
@@ -112,13 +128,16 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 	input.Title = strings.TrimSpace(input.Title)
 	input.Description = strings.TrimSpace(input.Description)
-
 	if input.Title == "" {
 		return UpdateInput{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
 	}
 
 	if !input.Status.Valid() {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
+	}
+
+	if input.RecurrenceType != recurrence.NoneRecurrence && input.RecurrenceStartDate == nil {
+		return UpdateInput{}, fmt.Errorf("%w: invalid_recurrence type or recurrence_start_date", ErrInvalidInput)
 	}
 
 	return input, nil

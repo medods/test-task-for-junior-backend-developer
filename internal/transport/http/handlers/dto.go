@@ -3,31 +3,42 @@ package handlers
 import (
 	"time"
 
-	taskdomain "example.com/taskservice/internal/domain/task"
+	"example.com/taskservice/internal/domain/common"
+	"example.com/taskservice/internal/domain/recurrence"
+	task "example.com/taskservice/internal/domain/task"
 )
 
 type taskMutationDTO struct {
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	Status      taskdomain.Status `json:"status"`
+	Title               string                       `json:"title" validate:"required,len=128"`
+	Description         string                       `json:"description" validate:"len=512"`
+	Status              task.Status                  `json:"status" validate:"required,oneof=new in_progress done"`
+	RecurrenceType      recurrence.RecurrenceType    `json:"recurrence_type" validate:"required"`
+	RecurrencePayload   recurrence.RecurrencePayload `json:"recurrence_payload" validate:"required"`
+	RecurrenceStartDate *common.DateType             `json:"recurrence_start_date" validate:"omitempty,datetime=2006-01-02"`
 }
 
 type taskDTO struct {
-	ID          int64             `json:"id"`
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	Status      taskdomain.Status `json:"status"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	ID                  int64                        `json:"id" validate:"required"`
+	Title               string                       `json:"title" validate:"required,len=128"`
+	Description         string                       `json:"description" validate:"len=512"`
+	Status              task.Status                  `json:"status" validate:"required,oneof=new in_progress done"`
+	CreatedAt           time.Time                    `json:"created_at" validate:"required"`
+	UpdatedAt           time.Time                    `json:"updated_at" validate:"required"`
+	RecurrenceType      recurrence.RecurrenceType    `json:"recurrence_type" validate:"required"`
+	RecurrencePayload   recurrence.RecurrencePayload `json:"recurrence_payload" validate:"required"`
+	RecurrenceStartDate *common.DateType             `json:"recurrence_start_date" validate:"omitempty,datetime=2006-01-02"`
 }
 
-func newTaskDTO(task *taskdomain.Task) taskDTO {
+func newTaskDTO(task *task.Task) taskDTO {
 	return taskDTO{
-		ID:          task.ID,
-		Title:       task.Title,
-		Description: task.Description,
-		Status:      task.Status,
-		CreatedAt:   task.CreatedAt,
-		UpdatedAt:   task.UpdatedAt,
+		ID:                  task.ID,
+		Title:               task.Title,
+		Description:         task.Description,
+		Status:              task.Status,
+		CreatedAt:           task.CreatedAt,
+		UpdatedAt:           task.UpdatedAt,
+		RecurrenceType:      task.RecurrenceType,
+		RecurrencePayload:   task.RecurrencePayload,
+		RecurrenceStartDate: task.RecurrenceStartDate,
 	}
 }
