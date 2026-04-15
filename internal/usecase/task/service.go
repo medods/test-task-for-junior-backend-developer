@@ -86,8 +86,26 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context) ([]taskdomain.Task, error) {
-	return s.repo.List(ctx)
+func (s *Service) List(ctx context.Context, input ListInput) ([]taskdomain.Task, error) {
+	if input.ScheduleID != nil && *input.ScheduleID <= 0 {
+		return nil, fmt.Errorf("%w: schedule_id must be positive", ErrInvalidInput)
+	}
+
+	if input.DateFrom != nil {
+		normalized := input.DateFrom.UTC().Truncate(24 * time.Hour)
+		input.DateFrom = &normalized
+	}
+
+	if input.DateTo != nil {
+		normalized := input.DateTo.UTC().Truncate(24 * time.Hour)
+		input.DateTo = &normalized
+	}
+
+	if input.DateFrom != nil && input.DateTo != nil && input.DateTo.Before(*input.DateFrom) {
+		return nil, fmt.Errorf("%w: date_to must be greater than or equal to date_from", ErrInvalidInput)
+	}
+
+	return s.repo.List(ctx, input)
 }
 
 func validateCreateInput(input CreateInput) (CreateInput, error) {

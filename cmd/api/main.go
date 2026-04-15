@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,12 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	infrastructurepostgres "example.com/taskservice/internal/infrastructure/postgres"
-	postgresrepo "example.com/taskservice/internal/repository/postgres"
+	"example.com/taskservice/internal/app"
 	transporthttp "example.com/taskservice/internal/transport/http"
 	swaggerdocs "example.com/taskservice/internal/transport/http/docs"
 	httphandlers "example.com/taskservice/internal/transport/http/handlers"
-	"example.com/taskservice/internal/usecase/task"
 )
 
 func main() {
@@ -23,23 +20,26 @@ func main() {
 		Level: slog.LevelInfo,
 	}))
 
-	cfg := loadConfig()
+	cfg, err := app.LoadConfig()
+	if err != nil {
+		logger.Error("load config", "error", err)
+		os.Exit(1)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := infrastructurepostgres.Open(ctx, cfg.DatabaseDSN)
+	container, err := app.NewContainer(ctx, cfg)
 	if err != nil {
-		logger.Error("open postgres", "error", err)
+		logger.Error("bootstrap application", "error", err)
 		os.Exit(1)
 	}
-	defer pool.Close()
+	defer container.Pool.Close()
 
-	taskRepo := postgresrepo.New(pool)
-	taskUsecase := task.NewService(taskRepo)
-	taskHandler := httphandlers.NewTaskHandler(taskUsecase)
+	taskHandler := httphandlers.NewTaskHandler(container.TaskService)
+	scheduleHandler := httphandlers.NewTaskScheduleHandler(container.ScheduleService)
 	docsHandler := swaggerdocs.NewHandler()
-	router := transporthttp.NewRouter(taskHandler, docsHandler)
+	router := transporthttp.NewRouter(taskHandler, scheduleHandler, docsHandler)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -64,30 +64,4 @@ func main() {
 		logger.Error("listen and serve", "error", err)
 		os.Exit(1)
 	}
-}
-
-type config struct {
-	HTTPAddr    string
-	DatabaseDSN string
-}
-
-func loadConfig() config {
-	cfg := config{
-		HTTPAddr:    envOrDefault("HTTP_ADDR", ":8080"),
-		DatabaseDSN: envOrDefault("DATABASE_DSN", "postgres://postgres:postgres@localhost:5432/taskservice?sslmode=disable"),
-	}
-
-	if cfg.DatabaseDSN == "" {
-		panic(fmt.Errorf("DATABASE_DSN is required"))
-	}
-
-	return cfg
-}
-
-func envOrDefault(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-
-	return fallback
 }

@@ -8,7 +8,9 @@ import (
 
 	"github.com/gorilla/mux"
 
+	scheduledomain "example.com/taskservice/internal/domain/schedule"
 	taskdomain "example.com/taskservice/internal/domain/task"
+	scheduleusecase "example.com/taskservice/internal/usecase/schedule"
 	taskusecase "example.com/taskservice/internal/usecase/task"
 )
 
@@ -33,7 +35,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Status:      req.Status,
 	})
 	if err != nil {
-		writeUsecaseError(w, err)
+		writeTaskUsecaseError(w, err)
 		return
 	}
 
@@ -49,7 +51,7 @@ func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.usecase.GetByID(r.Context(), id)
 	if err != nil {
-		writeUsecaseError(w, err)
+		writeTaskUsecaseError(w, err)
 		return
 	}
 
@@ -75,7 +77,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Status:      req.Status,
 	})
 	if err != nil {
-		writeUsecaseError(w, err)
+		writeTaskUsecaseError(w, err)
 		return
 	}
 
@@ -90,7 +92,7 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.usecase.Delete(r.Context(), id); err != nil {
-		writeUsecaseError(w, err)
+		writeTaskUsecaseError(w, err)
 		return
 	}
 
@@ -98,9 +100,15 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.usecase.List(r.Context())
+	filter, err := decodeTaskListInput(r)
 	if err != nil {
-		writeUsecaseError(w, err)
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	tasks, err := h.usecase.List(r.Context(), filter)
+	if err != nil {
+		writeTaskUsecaseError(w, err)
 		return
 	}
 
@@ -141,11 +149,53 @@ func decodeJSON(r *http.Request, dst any) error {
 	return nil
 }
 
-func writeUsecaseError(w http.ResponseWriter, err error) {
+func decodeTaskListInput(r *http.Request) (taskusecase.ListInput, error) {
+	values := r.URL.Query()
+
+	var filter taskusecase.ListInput
+	if raw := values.Get("date_from"); raw != "" {
+		parsed, err := scheduledomain.ParseDate(raw)
+		if err != nil {
+			return taskusecase.ListInput{}, errors.New("invalid date_from")
+		}
+		filter.DateFrom = &parsed
+	}
+
+	if raw := values.Get("date_to"); raw != "" {
+		parsed, err := scheduledomain.ParseDate(raw)
+		if err != nil {
+			return taskusecase.ListInput{}, errors.New("invalid date_to")
+		}
+		filter.DateTo = &parsed
+	}
+
+	if raw := values.Get("schedule_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed <= 0 {
+			return taskusecase.ListInput{}, errors.New("invalid schedule_id")
+		}
+		filter.ScheduleID = &parsed
+	}
+
+	return filter, nil
+}
+
+func writeTaskUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, taskdomain.ErrNotFound):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, taskusecase.ErrInvalidInput):
+		writeError(w, http.StatusBadRequest, err)
+	default:
+		writeError(w, http.StatusInternalServerError, err)
+	}
+}
+
+func writeScheduleUsecaseError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, scheduledomain.ErrNotFound):
+		writeError(w, http.StatusNotFound, err)
+	case errors.Is(err, scheduleusecase.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err)
 	default:
 		writeError(w, http.StatusInternalServerError, err)

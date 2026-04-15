@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Task Service API",
-    "version": "1.0.0",
-    "description": "CRUD API for tasks built with clean architecture."
+    "version": "2.0.0",
+    "description": "API for one-off tasks and recurring task schedules."
   },
   "servers": [
     {
@@ -13,7 +13,11 @@
   "tags": [
     {
       "name": "Tasks",
-      "description": "Operations with tasks"
+      "description": "Operations with task instances"
+    },
+    {
+      "name": "TaskSchedules",
+      "description": "Operations with recurring task schedules"
     }
   ],
   "paths": {
@@ -21,6 +25,33 @@
       "get": {
         "tags": ["Tasks"],
         "summary": "List tasks",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "schedule_id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Task list",
@@ -32,12 +63,13 @@
                 }
               }
             }
-          }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
         }
       },
       "post": {
         "tags": ["Tasks"],
-        "summary": "Create task",
+        "summary": "Create one-off task",
         "requestBody": {
           "required": true,
           "content": {
@@ -131,6 +163,121 @@
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
+    },
+    "/api/v1/task-schedules": {
+      "get": {
+        "tags": ["TaskSchedules"],
+        "summary": "List task schedules",
+        "responses": {
+          "200": {
+            "description": "Task schedules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/TaskSchedule" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["TaskSchedules"],
+        "summary": "Create task schedule",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskScheduleRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created task schedule",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskSchedule" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/v1/task-schedules/{id}": {
+      "get": {
+        "tags": ["TaskSchedules"],
+        "summary": "Get task schedule by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task schedule",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskSchedule" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["TaskSchedules"],
+        "summary": "Update task schedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskScheduleRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated task schedule",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskSchedule" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["TaskSchedules"],
+        "summary": "Deactivate task schedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Deactivated" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
     }
   },
   "components": {
@@ -157,14 +304,8 @@
         "type": "object",
         "required": ["title"],
         "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
+          "title": { "type": "string", "example": "Prepare release" },
+          "description": { "type": "string", "example": "Collect release notes and check migrations" },
           "status": {
             "type": "string",
             "enum": ["new", "in_progress", "done"],
@@ -176,18 +317,106 @@
         "type": "object",
         "required": ["title", "status"],
         "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
+          "title": { "type": "string", "example": "Prepare release" },
+          "description": { "type": "string", "example": "Collect release notes and check migrations" },
           "status": {
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          }
+        }
+      },
+      "Recurrence": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["daily_interval", "monthly_day", "specific_dates", "month_parity"],
+            "example": "daily_interval"
+          },
+          "every_days": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 2
+          },
+          "day_of_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "example": 15
+          },
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "parity": {
+            "type": "string",
+            "enum": ["even", "odd"],
+            "example": "even"
+          }
+        }
+      },
+      "TaskScheduleRequest": {
+        "type": "object",
+        "required": ["title", "start_date", "recurrence"],
+        "properties": {
+          "title": { "type": "string", "example": "Call patients" },
+          "description": { "type": "string", "example": "Daily follow-up call list" },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-04-15"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean",
+            "example": true
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/Recurrence"
+          }
+        }
+      },
+      "TaskSchedule": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "example": 5 },
+          "title": { "type": "string", "example": "Call patients" },
+          "description": { "type": "string", "example": "Daily follow-up call list" },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-04-15"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean",
+            "example": true
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/Recurrence"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-04-15T00:00:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-04-15T00:00:00Z"
           }
         }
       },
@@ -204,6 +433,18 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "scheduled_for": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "example": "2026-04-20"
+          },
+          "schedule_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "example": 5
           },
           "created_at": {
             "type": "string",
