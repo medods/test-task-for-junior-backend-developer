@@ -172,10 +172,16 @@ func (r *Repository) ListByDate(ctx context.Context, date time.Time) ([]taskdoma
         AND $1::date >= recurrence_start_date
       )
       OR
-      (
-        recurrence_type = 'specific_dates'
-        AND (recurrence_payload->'specific_dates') ? to_char($1::date, 'YYYY-MM-DD')
-      )
+    (
+    recurrence_type = 'specific_dates'
+    AND $1::date >= recurrence_start_date
+    AND EXISTS (
+        SELECT 1
+        FROM task_specific_dates tsd
+        WHERE tsd.task_id = tasks.id
+        AND tsd.date = $1::date
+    )
+    )
       OR
       (
         recurrence_type = 'month_parity'
