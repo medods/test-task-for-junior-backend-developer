@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"example.com/taskservice/internal/domain/common"
 	"example.com/taskservice/internal/domain/recurrence"
 	task "example.com/taskservice/internal/domain/task"
 )
@@ -99,7 +100,8 @@ func (s *Service) List(ctx context.Context) ([]task.Task, error) {
 }
 
 func (s *Service) ListByDate(ctx context.Context, date time.Time) ([]task.Task, error) {
-	return s.repo.ListByDate(ctx, date)
+	normalized := common.NewDate(date.UTC()).Time
+	return s.repo.ListByDate(ctx, normalized)
 }
 
 func validateCreateInput(input CreateInput) (CreateInput, error) {
