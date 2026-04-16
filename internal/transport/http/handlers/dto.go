@@ -10,19 +10,19 @@ import (
 )
 
 type taskMutationDTO struct {
-	Title               string                       `json:"title" validate:"required,len=128"`
-	Description         string                       `json:"description" validate:"len=512"`
-	Status              task.Status                  `json:"status" validate:"required,oneof=new in_progress done"`
-	RecurrenceType      recurrence.RecurrenceType    `json:"recurrence_type" validate:"required"`
-	RecurrencePayload   recurrence.RecurrencePayload `json:"recurrence_payload" validate:"required"`
-	RecurrenceStartDate *common.DateType             `json:"recurrence_start_date" validate:"omitempty,datetime=2006-01-02"`
+	Title               string                       `json:"title" validate:"required,max=128"`
+	Description         string                       `json:"description" validate:"max=512"`
+	Status              task.Status                  `json:"status" validate:"omitempty,oneof=new in_progress done"`
+	RecurrenceType      recurrence.RecurrenceType    `json:"recurrence_type" validate:"required,oneof=none daily_every_n monthly_day specific_dates month_parity"`
+	RecurrencePayload   recurrence.RecurrencePayload `json:"recurrence_payload"`
+	RecurrenceStartDate *common.DateType             `json:"recurrence_start_date"`
 }
 
 type taskPatchDTO struct {
-	Title             *string                       `json:"title"`
-	Description       *string                       `json:"description"`
-	Status            *task.Status                  `json:"status"`
-	RecurrenceType    *recurrence.RecurrenceType    `json:"recurrence_type"`
+	Title             *string                       `json:"title" validate:"omitempty,max=128"`
+	Description       *string                       `json:"description" validate:"omitempty,max=512"`
+	Status            *task.Status                  `json:"status" validate:"omitempty,oneof=new in_progress done"`
+	RecurrenceType    *recurrence.RecurrenceType    `json:"recurrence_type" validate:"omitempty,oneof=none daily_every_n monthly_day specific_dates month_parity"`
 	RecurrencePayload *recurrence.RecurrencePayload `json:"recurrence_payload"`
 
 	RecurrenceStartDate json.RawMessage `json:"recurrence_start_date"`
@@ -30,14 +30,14 @@ type taskPatchDTO struct {
 
 type taskDTO struct {
 	ID                  int64                        `json:"id" validate:"required"`
-	Title               string                       `json:"title" validate:"required,len=128"`
-	Description         string                       `json:"description" validate:"len=512"`
+	Title               string                       `json:"title" validate:"required,max=128"`
+	Description         string                       `json:"description" validate:"max=512"`
 	Status              task.Status                  `json:"status" validate:"required,oneof=new in_progress done"`
 	CreatedAt           time.Time                    `json:"created_at" validate:"required"`
 	UpdatedAt           time.Time                    `json:"updated_at" validate:"required"`
-	RecurrenceType      recurrence.RecurrenceType    `json:"recurrence_type" validate:"required"`
-	RecurrencePayload   recurrence.RecurrencePayload `json:"recurrence_payload" validate:"required"`
-	RecurrenceStartDate *common.DateType             `json:"recurrence_start_date" validate:"omitempty,datetime=2006-01-02"`
+	RecurrenceType      recurrence.RecurrenceType    `json:"recurrence_type" validate:"required,oneof=none daily_every_n monthly_day specific_dates month_parity"`
+	RecurrencePayload   recurrence.RecurrencePayload `json:"recurrence_payload"`
+	RecurrenceStartDate *common.DateType             `json:"recurrence_start_date"`
 }
 
 func newTaskDTO(task *task.Task) taskDTO {

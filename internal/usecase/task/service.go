@@ -186,8 +186,8 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
-	if input.RecurrenceType != recurrence.NoneRecurrence && input.RecurrenceStartDate == nil {
-		return CreateInput{}, fmt.Errorf("%w: invalid_recurrence type or recurrence_start_date", ErrInvalidInput)
+	if err := validateRecurrence(input.RecurrenceType, input.RecurrencePayload, input.RecurrenceStartDate); err != nil {
+		return CreateInput{}, err
 	}
 
 	return input, nil
@@ -204,9 +204,68 @@ func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
-	if input.RecurrenceType != recurrence.NoneRecurrence && input.RecurrenceStartDate == nil {
-		return UpdateInput{}, fmt.Errorf("%w: invalid_recurrence type or recurrence_start_date", ErrInvalidInput)
+	if err := validateRecurrence(input.RecurrenceType, input.RecurrencePayload, input.RecurrenceStartDate); err != nil {
+		return UpdateInput{}, err
 	}
 
 	return input, nil
+}
+
+func validateRecurrence(rt recurrence.RecurrenceType, payload recurrence.RecurrencePayload, startDate *common.DateType) error {
+	switch rt {
+	case recurrence.NoneRecurrence,
+		recurrence.DailyEveryN,
+		recurrence.MonthlyDay,
+		recurrence.SpecificDates,
+		recurrence.MonthParity:
+	default:
+		return fmt.Errorf("%w: invalid recurrence_type", ErrInvalidInput)
+	}
+
+	if rt != recurrence.NoneRecurrence && startDate == nil {
+		return fmt.Errorf("%w: recurrence_start_date is required", ErrInvalidInput)
+	}
+
+	switch rt {
+	case recurrence.NoneRecurrence:
+		return nil
+	case recurrence.DailyEveryN:
+		if payload.IntervalDays < 1 {
+			return fmt.Errorf("%w: interval_days must be >= 1", ErrInvalidInput)
+		}
+		return nil
+	case recurrence.MonthlyDay:
+		if payload.MonthDay < 1 || payload.MonthDay > 30 {
+			return fmt.Errorf("%w: month_day must be between 1 and 30", ErrInvalidInput)
+		}
+		return nil
+	case recurrence.SpecificDates:
+		if len(payload.SpecificDates) == 0 {
+			return fmt.Errorf("%w: specific_dates must not be empty", ErrInvalidInput)
+		}
+
+		start := common.NewDate(startDate.Time.UTC()).Time
+		seen := make(map[string]struct{}, len(payload.SpecificDates))
+		for _, sd := range payload.SpecificDates {
+			d := common.NewDate(sd.Time.UTC()).Time
+			if d.Before(start) {
+				return fmt.Errorf("%w: specific_dates must be on/after recurrence_start_date", ErrInvalidInput)
+			}
+
+			key := d.Format(common.DateLayout)
+			if _, ok := seen[key]; ok {
+				return fmt.Errorf("%w: specific_dates must be unique", ErrInvalidInput)
+			}
+			seen[key] = struct{}{}
+		}
+
+		return nil
+	case recurrence.MonthParity:
+		if payload.Parity != recurrence.Even && payload.Parity != recurrence.Odd {
+			return fmt.Errorf("%w: parity must be even or odd", ErrInvalidInput)
+		}
+		return nil
+	default:
+		return fmt.Errorf("%w: invalid recurrence_type", ErrInvalidInput)
+	}
 }

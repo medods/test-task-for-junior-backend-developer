@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 
 	"example.com/taskservice/internal/domain/common"
@@ -20,6 +21,8 @@ type TaskHandler struct {
 	usecase taskusecase.Usecase
 }
 
+var requestValidator = validator.New()
+
 func NewTaskHandler(usecase taskusecase.Usecase) *TaskHandler {
 	return &TaskHandler{usecase: usecase}
 }
@@ -27,6 +30,10 @@ func NewTaskHandler(usecase taskusecase.Usecase) *TaskHandler {
 func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req taskMutationDTO
 	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := requestValidator.Struct(req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
@@ -75,6 +82,10 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := requestValidator.Struct(req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
 		Title:               req.Title,
@@ -101,6 +112,10 @@ func (h *TaskHandler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	var req taskPatchDTO
 	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := requestValidator.Struct(req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
