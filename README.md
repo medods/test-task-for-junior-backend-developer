@@ -4,7 +4,7 @@
 
 ## Требования
 
-- Go `1.23+`
+- Go `1.25+`
 - Docker и Docker Compose
 
 ## Быстрый запуск через Docker Compose
@@ -99,6 +99,25 @@ TEST_DATABASE_DSN="postgres://postgres:postgres@localhost:5430/taskservice?sslmo
 ```bash
 docker compose down -v
 ```
+
+## Разработка
+
+- Быстрый локальный запуск (скрипт и Makefile):
+
+```bash
+./run.sh     # запустит `docker compose up --build`
+make up      # тоже самое через Makefile
+make start   # поднять в background и показать логи
+make down    # остановить и удалить контейнеры
+```
+
+- Тесты:
+
+```bash
+make test             # unit tests: go test ./... -cover
+make test-integration # интеграционные тесты (поднимают postgres + migrator)
+```
+
 
 ## Фичa: Периодичность задач (recurrence)
 
