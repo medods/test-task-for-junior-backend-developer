@@ -1,6 +1,7 @@
-// Package recurrence
+// Package recurrence defines recurrence types and payloads.
 package recurrence
 
+// RecurrenceType represents the recurrence strategy of a task.
 type RecurrenceType string
 
 const (

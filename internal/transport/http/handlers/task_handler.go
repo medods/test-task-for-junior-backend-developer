@@ -1,3 +1,4 @@
+// Package handlers contains HTTP handlers for the API.
 package handlers
 
 import (
@@ -17,16 +18,19 @@ import (
 	taskusecase "example.com/taskservice/internal/usecase/task"
 )
 
+// TaskHandler handles task HTTP requests.
 type TaskHandler struct {
 	usecase taskusecase.Usecase
 }
 
 var requestValidator = validator.New()
 
+// NewTaskHandler creates a TaskHandler.
 func NewTaskHandler(usecase taskusecase.Usecase) *TaskHandler {
 	return &TaskHandler{usecase: usecase}
 }
 
+// Create handles POST /tasks.
 func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req taskMutationDTO
 	if err := decodeJSON(r, &req); err != nil {
@@ -54,6 +58,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, newTaskDTO(created))
 }
 
+// GetByID handles GET /tasks/{id}.
 func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromRequest(r)
 	if err != nil {
@@ -70,6 +75,7 @@ func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, newTaskDTO(task))
 }
 
+// Update handles PUT /tasks/{id}.
 func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromRequest(r)
 	if err != nil {
@@ -103,6 +109,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, newTaskDTO(updated))
 }
 
+// Patch handles PATCH /tasks/{id}.
 func (h *TaskHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromRequest(r)
 	if err != nil {
@@ -151,6 +158,7 @@ func (h *TaskHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, newTaskDTO(updated))
 }
 
+// Delete handles DELETE /tasks/{id}.
 func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromRequest(r)
 	if err != nil {
@@ -166,6 +174,7 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// List handles GET /tasks and supports filtering by date via ?date=YYYY-MM-DD.
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	requestDate := r.URL.Query().Get("date")
 	tasks := make([]task.Task, 0)

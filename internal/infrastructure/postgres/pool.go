@@ -1,3 +1,4 @@
+// Package postgres provides helpers for connecting to PostgreSQL.
 package postgres
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Open creates a pgxpool.Pool for the provided DSN and verifies connectivity.
 func Open(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("database dsn is empty")

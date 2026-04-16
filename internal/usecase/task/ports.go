@@ -9,6 +9,7 @@ import (
 	task "example.com/taskservice/internal/domain/task"
 )
 
+// Repository defines persistence operations required by the use case.
 type Repository interface {
 	Create(ctx context.Context, task *task.Task) (*task.Task, error)
 	GetByID(ctx context.Context, id int64) (*task.Task, error)
@@ -18,6 +19,7 @@ type Repository interface {
 	ListByDate(ctx context.Context, date time.Time) ([]task.Task, error)
 }
 
+// Usecase defines task application operations.
 type Usecase interface {
 	Create(ctx context.Context, input CreateInput) (*task.Task, error)
 	GetByID(ctx context.Context, id int64) (*task.Task, error)
@@ -28,6 +30,7 @@ type Usecase interface {
 	ListByDate(ctx context.Context, date time.Time) ([]task.Task, error)
 }
 
+// CreateInput is input for creating a task.
 type CreateInput struct {
 	Title               string
 	Description         string
@@ -37,6 +40,7 @@ type CreateInput struct {
 	RecurrenceStartDate *common.DateType
 }
 
+// UpdateInput is input for updating a task.
 type UpdateInput struct {
 	Title               string
 	Description         string
@@ -46,6 +50,7 @@ type UpdateInput struct {
 	RecurrenceStartDate *common.DateType
 }
 
+// PatchInput is input for partially updating a task.
 type PatchInput struct {
 	Title             *string
 	Description       *string

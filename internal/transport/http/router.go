@@ -1,3 +1,4 @@
+// Package transporthttp wires the HTTP transport (router and middleware).
 package transporthttp
 
 import (
@@ -10,6 +11,7 @@ import (
 	httphandlers "example.com/taskservice/internal/transport/http/handlers"
 )
 
+// NewRouter builds the service HTTP router.
 func NewRouter(taskHandler *httphandlers.TaskHandler, docsHandler *swaggerdocs.Handler) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 

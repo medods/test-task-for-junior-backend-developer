@@ -1,5 +1,6 @@
 package recurrence
 
+// Parity represents even/odd parity used by MonthParity recurrence.
 type Parity string
 
 const (

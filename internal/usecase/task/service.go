@@ -1,4 +1,4 @@
-// Package task
+// Package task contains task use cases.
 package task
 
 import (
@@ -12,11 +12,13 @@ import (
 	task "example.com/taskservice/internal/domain/task"
 )
 
+// Service implements the task use cases.
 type Service struct {
 	repo Repository
 	now  func() time.Time
 }
 
+// NewService creates a Service.
 func NewService(repo Repository) *Service {
 	return &Service{
 		repo: repo,
@@ -24,6 +26,7 @@ func NewService(repo Repository) *Service {
 	}
 }
 
+// Create creates a new task.
 func (s *Service) Create(ctx context.Context, input CreateInput) (*task.Task, error) {
 	normalized, err := validateCreateInput(input)
 	if err != nil {
@@ -50,6 +53,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*task.Task, er
 	return created, nil
 }
 
+// GetByID returns a task by id.
 func (s *Service) GetByID(ctx context.Context, id int64) (*task.Task, error) {
 	if id <= 0 {
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
@@ -58,6 +62,7 @@ func (s *Service) GetByID(ctx context.Context, id int64) (*task.Task, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
+// Update updates a task with a full replacement payload.
 func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*task.Task, error) {
 	if id <= 0 {
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
@@ -87,6 +92,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 	return updated, nil
 }
 
+// Patch partially updates a task.
 func (s *Service) Patch(ctx context.Context, id int64, input PatchInput) (*task.Task, error) {
 	if id <= 0 {
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
@@ -153,6 +159,7 @@ func (s *Service) Patch(ctx context.Context, id int64, input PatchInput) (*task.
 	return updated, nil
 }
 
+// Delete removes a task by id.
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return fmt.Errorf("%w: id must be positive", ErrInvalidInput)
@@ -161,10 +168,12 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
 }
 
+// List returns all tasks.
 func (s *Service) List(ctx context.Context) ([]task.Task, error) {
 	return s.repo.List(ctx)
 }
 
+// ListByDate returns tasks active on the given date.
 func (s *Service) ListByDate(ctx context.Context, date time.Time) ([]task.Task, error) {
 	normalized := common.NewDate(date.UTC()).Time
 	return s.repo.ListByDate(ctx, normalized)

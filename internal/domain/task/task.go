@@ -1,4 +1,4 @@
-// Package task
+// Package task contains the task domain model.
 package task
 
 import (
@@ -8,6 +8,7 @@ import (
 	"example.com/taskservice/internal/domain/recurrence"
 )
 
+// Status represents a task status.
 type Status string
 
 const (
@@ -16,6 +17,7 @@ const (
 	StatusDone       Status = "done"
 )
 
+// Task is the core domain entity.
 type Task struct {
 	ID                  int64                        `json:"id" validate:"required"`
 	Title               string                       `json:"title" validate:"required,len=128"`
@@ -28,6 +30,7 @@ type Task struct {
 	RecurrenceStartDate *common.DateType             `json:"recurrence_start_date"`
 }
 
+// Valid reports whether the status is known.
 func (s Status) Valid() bool {
 	switch s {
 	case StatusNew, StatusInProgress, StatusDone:
@@ -37,6 +40,7 @@ func (s Status) Valid() bool {
 	}
 }
 
+// ActiveOn reports whether the task is active on the given date.
 func (t Task) ActiveOn(date time.Time) bool {
 	d := common.NewDate(date.UTC()).Time
 	if t.RecurrenceType == recurrence.NoneRecurrence {

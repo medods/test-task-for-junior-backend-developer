@@ -1,3 +1,4 @@
+// Package postgres contains PostgreSQL repository implementations.
 package postgres
 
 import (
@@ -13,14 +14,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Repository implements task storage in PostgreSQL.
 type Repository struct {
 	pool *pgxpool.Pool
 }
 
+// New creates a Repository backed by the provided pool.
 func New(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
+// Create inserts a new task and returns the persisted model.
 func (r *Repository) Create(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
 	const query = `
 		INSERT INTO tasks (title, description, status, created_at, updated_at, recurrence_type, recurrence_payload, recurrence_start_date)
@@ -62,6 +66,7 @@ func (r *Repository) Create(ctx context.Context, task *taskdomain.Task) (*taskdo
 	return created, nil
 }
 
+// GetByID returns a task by its id.
 func (r *Repository) GetByID(ctx context.Context, id int64) (*taskdomain.Task, error) {
 	const query = `
 		SELECT id, title, description, status, created_at, updated_at, recurrence_type, recurrence_payload, recurrence_start_date
@@ -82,6 +87,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*taskdomain.Task, e
 	return found, nil
 }
 
+// Update updates an existing task and returns the persisted model.
 func (r *Repository) Update(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
 	const query = `
 		UPDATE tasks
@@ -135,6 +141,7 @@ func (r *Repository) Update(ctx context.Context, task *taskdomain.Task) (*taskdo
 	return updated, nil
 }
 
+// Delete removes a task by its id.
 func (r *Repository) Delete(ctx context.Context, id int64) error {
 	const query = `DELETE FROM tasks WHERE id = $1`
 
@@ -150,6 +157,7 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
+// List returns all tasks.
 func (r *Repository) List(ctx context.Context) ([]taskdomain.Task, error) {
 	const query = `
 		SELECT id, title, description, status, created_at, updated_at, recurrence_type, recurrence_payload, recurrence_start_date
@@ -180,6 +188,7 @@ func (r *Repository) List(ctx context.Context) ([]taskdomain.Task, error) {
 	return tasks, nil
 }
 
+// ListByDate returns tasks active on the given date.
 func (r *Repository) ListByDate(ctx context.Context, date time.Time) ([]taskdomain.Task, error) {
 	const query = `
     SELECT id, title, description, status, created_at, updated_at, recurrence_type, recurrence_payload, recurrence_start_date

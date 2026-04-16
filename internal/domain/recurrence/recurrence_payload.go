@@ -4,6 +4,7 @@ import (
 	"example.com/taskservice/internal/domain/common"
 )
 
+// RecurrencePayload contains parameters for the selected RecurrenceType.
 type RecurrencePayload struct {
 	IntervalDays  int               `json:"interval_days" validate:"omitempty,min=1"`
 	MonthDay      int               `json:"month_day" validate:"omitempty,min=1,max=30"`
