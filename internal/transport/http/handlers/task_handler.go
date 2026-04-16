@@ -31,6 +31,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		ScheduledAt: req.ScheduledAt,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -73,6 +74,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		ScheduledAt: req.ScheduledAt,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -98,7 +100,12 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.usecase.List(r.Context())
+	filter := taskusecase.ListFilter{}
+	if gid := r.URL.Query().Get("recurrence_group_id"); gid != "" {
+		filter.RecurrenceGroupID = &gid
+	}
+
+	tasks, err := h.usecase.List(r.Context(), filter)
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
@@ -110,6 +117,62 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (h *TaskHandler) CreateRecurring(w http.ResponseWriter, r *http.Request) {
+	var req createRecurringRequestDTO
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	recurrenceInput, err := req.Recurrence.toRecurrenceInput()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	tasks, err := h.usecase.CreateRecurring(r.Context(), taskusecase.CreateRecurringInput{
+		Title:       req.Title,
+		Description: req.Description,
+		Status:      req.Status,
+		Recurrence:  recurrenceInput,
+	})
+	if err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	dtos := make([]taskDTO, 0, len(tasks))
+	for i := range tasks {
+		dtos = append(dtos, newTaskDTO(&tasks[i]))
+	}
+
+	groupID := ""
+	if len(tasks) > 0 && tasks[0].RecurrenceGroupID != nil {
+		groupID = *tasks[0].RecurrenceGroupID
+	}
+
+	writeJSON(w, http.StatusCreated, createRecurringResponseDTO{
+		RecurrenceGroupID: groupID,
+		Tasks:             dtos,
+	})
+}
+
+func (h *TaskHandler) DeleteByGroupID(w http.ResponseWriter, r *http.Request) {
+	groupID := mux.Vars(r)["group_id"]
+	if groupID == "" {
+		writeError(w, http.StatusBadRequest, errors.New("missing group_id"))
+		return
+	}
+
+	count, err := h.usecase.DeleteByGroupID(r.Context(), groupID)
+	if err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]int64{"deleted": count})
 }
 
 func getIDFromRequest(r *http.Request) (int64, error) {

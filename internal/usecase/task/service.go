@@ -27,21 +27,17 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		return nil, err
 	}
 
+	now := s.now()
 	model := &taskdomain.Task{
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
-	}
-	now := s.now()
-	model.CreatedAt = now
-	model.UpdatedAt = now
-
-	created, err := s.repo.Create(ctx, model)
-	if err != nil {
-		return nil, err
+		ScheduledAt: normalized.ScheduledAt,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
-	return created, nil
+	return s.repo.Create(ctx, model)
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (*taskdomain.Task, error) {
@@ -67,15 +63,11 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		ScheduledAt: normalized.ScheduledAt,
 		UpdatedAt:   s.now(),
 	}
 
-	updated, err := s.repo.Update(ctx, model)
-	if err != nil {
-		return nil, err
-	}
-
-	return updated, nil
+	return s.repo.Update(ctx, model)
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
@@ -86,8 +78,64 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context) ([]taskdomain.Task, error) {
-	return s.repo.List(ctx)
+func (s *Service) List(ctx context.Context, filter ListFilter) ([]taskdomain.Task, error) {
+	return s.repo.List(ctx, filter)
+}
+
+// CreateRecurring expands the recurrence rule into a set of dates, then creates
+// one task per date. All tasks share a recurrence_group_id so they can be
+// queried and managed together.
+func (s *Service) CreateRecurring(ctx context.Context, input CreateRecurringInput) ([]taskdomain.Task, error) {
+	title := strings.TrimSpace(input.Title)
+	if title == "" {
+		return nil, fmt.Errorf("%w: title is required", ErrInvalidInput)
+	}
+
+	if input.Status == "" {
+		input.Status = taskdomain.StatusNew
+	}
+	if !input.Status.Valid() {
+		return nil, fmt.Errorf("%w: invalid status", ErrInvalidInput)
+	}
+
+	dates, err := taskdomain.ExpandDates(input.Recurrence)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrInvalidInput, err)
+	}
+	if len(dates) == 0 {
+		return nil, fmt.Errorf("%w: recurrence produces no dates in the given range", ErrInvalidInput)
+	}
+
+	groupID := taskdomain.NewGroupID()
+	recurrenceCfg := input.Recurrence.Config()
+	now := s.now()
+
+	tasks := make([]*taskdomain.Task, 0, len(dates))
+	for _, d := range dates {
+		d := d // capture
+		tasks = append(tasks, &taskdomain.Task{
+			Title:             title,
+			Description:       strings.TrimSpace(input.Description),
+			Status:            input.Status,
+			ScheduledAt:       &d,
+			RecurrenceGroupID: &groupID,
+			Recurrence:        recurrenceCfg,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		})
+	}
+
+	return s.repo.CreateBatch(ctx, tasks)
+}
+
+// DeleteByGroupID removes every task belonging to groupID.
+func (s *Service) DeleteByGroupID(ctx context.Context, groupID string) (int64, error) {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return 0, fmt.Errorf("%w: group_id is required", ErrInvalidInput)
+	}
+
+	return s.repo.DeleteByGroupID(ctx, groupID)
 }
 
 func validateCreateInput(input CreateInput) (CreateInput, error) {
