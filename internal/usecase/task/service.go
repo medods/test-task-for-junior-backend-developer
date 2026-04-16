@@ -87,6 +87,72 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 	return updated, nil
 }
 
+func (s *Service) Patch(ctx context.Context, id int64, input PatchInput) (*task.Task, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
+	}
+
+	if input.Title == nil && input.Description == nil && input.Status == nil && input.RecurrenceType == nil && input.RecurrencePayload == nil && !input.RecurrenceStartDateSet {
+		return nil, fmt.Errorf("%w: no fields to update", ErrInvalidInput)
+	}
+
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	upd := UpdateInput{
+		Title:               existing.Title,
+		Description:         existing.Description,
+		Status:              existing.Status,
+		RecurrenceType:      existing.RecurrenceType,
+		RecurrencePayload:   existing.RecurrencePayload,
+		RecurrenceStartDate: existing.RecurrenceStartDate,
+	}
+
+	if input.Title != nil {
+		upd.Title = *input.Title
+	}
+	if input.Description != nil {
+		upd.Description = *input.Description
+	}
+	if input.Status != nil {
+		upd.Status = *input.Status
+	}
+	if input.RecurrenceType != nil {
+		upd.RecurrenceType = *input.RecurrenceType
+	}
+	if input.RecurrencePayload != nil {
+		upd.RecurrencePayload = *input.RecurrencePayload
+	}
+	if input.RecurrenceStartDateSet {
+		upd.RecurrenceStartDate = input.RecurrenceStartDate
+	}
+
+	normalized, err := validateUpdateInput(upd)
+	if err != nil {
+		return nil, err
+	}
+
+	model := &task.Task{
+		ID:                  id,
+		Title:               normalized.Title,
+		Description:         normalized.Description,
+		Status:              normalized.Status,
+		RecurrenceType:      normalized.RecurrenceType,
+		RecurrencePayload:   normalized.RecurrencePayload,
+		RecurrenceStartDate: normalized.RecurrenceStartDate,
+		UpdatedAt:           s.now(),
+	}
+
+	updated, err := s.repo.Update(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+
+	return updated, nil
+}
+
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return fmt.Errorf("%w: id must be positive", ErrInvalidInput)

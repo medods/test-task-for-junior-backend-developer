@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -83,6 +84,50 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		RecurrencePayload:   req.RecurrencePayload,
 		RecurrenceStartDate: req.RecurrenceStartDate,
 	})
+	if err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newTaskDTO(updated))
+}
+
+func (h *TaskHandler) Patch(w http.ResponseWriter, r *http.Request) {
+	id, err := getIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	var req taskPatchDTO
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	input := taskusecase.PatchInput{
+		Title:             req.Title,
+		Description:       req.Description,
+		Status:            req.Status,
+		RecurrenceType:    req.RecurrenceType,
+		RecurrencePayload: req.RecurrencePayload,
+	}
+
+	if req.RecurrenceStartDate != nil {
+		input.RecurrenceStartDateSet = true
+
+		raw := bytes.TrimSpace(req.RecurrenceStartDate)
+		if string(raw) != "null" {
+			var d common.DateType
+			if err := json.Unmarshal(raw, &d); err != nil {
+				writeError(w, http.StatusBadRequest, err)
+				return
+			}
+			input.RecurrenceStartDate = &d
+		}
+	}
+
+	updated, err := h.usecase.Patch(r.Context(), id, input)
 	if err != nil {
 		writeUsecaseError(w, err)
 		return

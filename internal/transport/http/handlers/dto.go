@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"time"
 
 	"example.com/taskservice/internal/domain/common"
@@ -15,6 +16,16 @@ type taskMutationDTO struct {
 	RecurrenceType      recurrence.RecurrenceType    `json:"recurrence_type" validate:"required"`
 	RecurrencePayload   recurrence.RecurrencePayload `json:"recurrence_payload" validate:"required"`
 	RecurrenceStartDate *common.DateType             `json:"recurrence_start_date" validate:"omitempty,datetime=2006-01-02"`
+}
+
+type taskPatchDTO struct {
+	Title             *string                       `json:"title"`
+	Description       *string                       `json:"description"`
+	Status            *task.Status                  `json:"status"`
+	RecurrenceType    *recurrence.RecurrenceType    `json:"recurrence_type"`
+	RecurrencePayload *recurrence.RecurrencePayload `json:"recurrence_payload"`
+
+	RecurrenceStartDate json.RawMessage `json:"recurrence_start_date"`
 }
 
 type taskDTO struct {
