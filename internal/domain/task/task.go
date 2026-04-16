@@ -55,18 +55,6 @@ func (t Task) ActiveOn(date time.Time) bool {
 		return false
 	}
 
-	if t.RecurrenceType == recurrence.DailyEveryN {
-		if t.RecurrencePayload.IntervalDays <= 0 || t.RecurrenceStartDate == nil {
-			return false
-		}
-		diff := t.RecurrenceStartDate.Sub(date)
-
-		if diff >= 0 && diff%time.Duration(t.RecurrencePayload.IntervalDays) == 0 {
-			return true
-		}
-		return false
-	}
-
 	switch t.RecurrenceType {
 	case recurrence.DailyEveryN:
 		n := t.RecurrencePayload.IntervalDays
