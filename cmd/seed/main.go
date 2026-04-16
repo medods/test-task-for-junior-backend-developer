@@ -60,9 +60,9 @@ func main() {
 	}
 
 	_, err = uc.Create(ctx, task.CreateInput{
-		Title:       "Daily every 2 days",
-		Description: "Seeded",
-		Status:      taskdomain.StatusNew,
+		Title:          "Daily every 2 days",
+		Description:    "Seeded",
+		Status:         taskdomain.StatusNew,
 		RecurrenceType: recurrence.DailyEveryN,
 		RecurrencePayload: recurrence.RecurrencePayload{
 			IntervalDays: 2,
@@ -75,9 +75,9 @@ func main() {
 	}
 
 	_, err = uc.Create(ctx, task.CreateInput{
-		Title:       "Monthly day 15",
-		Description: "Seeded",
-		Status:      taskdomain.StatusNew,
+		Title:          "Monthly day 15",
+		Description:    "Seeded",
+		Status:         taskdomain.StatusNew,
 		RecurrenceType: recurrence.MonthlyDay,
 		RecurrencePayload: recurrence.RecurrencePayload{
 			MonthDay: 15,
@@ -91,9 +91,9 @@ func main() {
 
 	tomorrow := common.NewDate(now.Add(24 * time.Hour))
 	_, err = uc.Create(ctx, task.CreateInput{
-		Title:       "Specific dates",
-		Description: "Seeded",
-		Status:      taskdomain.StatusNew,
+		Title:          "Specific dates",
+		Description:    "Seeded",
+		Status:         taskdomain.StatusNew,
 		RecurrenceType: recurrence.SpecificDates,
 		RecurrencePayload: recurrence.RecurrencePayload{
 			SpecificDates: []common.DateType{today, tomorrow},
@@ -106,9 +106,9 @@ func main() {
 	}
 
 	_, err = uc.Create(ctx, task.CreateInput{
-		Title:       "Even days",
-		Description: "Seeded",
-		Status:      taskdomain.StatusNew,
+		Title:          "Even days",
+		Description:    "Seeded",
+		Status:         taskdomain.StatusNew,
 		RecurrenceType: recurrence.MonthParity,
 		RecurrencePayload: recurrence.RecurrencePayload{
 			Parity: recurrence.Even,
