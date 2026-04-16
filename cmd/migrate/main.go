@@ -71,10 +71,6 @@ func main() {
 }
 
 func staircase(m *migrate.Migrate) error {
-	// Step up one-by-one. If the file-source driver fails due to
-	// filesystem/path issues (common when working with paths containing
-	// spaces/special chars), fall back to a full Up() to ensure migrations
-	// are applied.
 	for {
 		err := m.Steps(1)
 		if err == nil {
@@ -92,8 +88,6 @@ func staircase(m *migrate.Migrate) error {
 		return err
 	}
 
-	// Step down one-by-one. If Steps(-1) fails similarly, fall back to Down()
-	// to revert applied migrations.
 	for {
 		err := m.Steps(-1)
 		if err == nil {
@@ -121,8 +115,6 @@ func isFileMissingErr(err error) bool {
 	if errors.Is(err, os.ErrNotExist) {
 		return true
 	}
-	// migrate/file driver sometimes returns an error string containing
-	// "file does not exist" or similar messages; check common substrings.
 	s := err.Error()
 	if strings.Contains(s, "file does not exist") || strings.Contains(s, "no such file") || strings.Contains(s, "failed to read") {
 		return true
