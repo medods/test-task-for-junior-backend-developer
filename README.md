@@ -55,3 +55,69 @@ http://localhost:8080/swagger/openapi.json
 - `PUT /api/v1/tasks/{id}`
 - `PATCH /api/v1/tasks/{id}`
 - `DELETE /api/v1/tasks/{id}`
+
+## Миграции и сидирование
+
+Есть отдельные утилиты для миграций и сидирования базы в `cmd/`.
+
+- Применить миграции (локально):
+
+```bash
+DATABASE_DSN="postgres://postgres:postgres@localhost:5430/taskservice?sslmode=disable" go run ./cmd/migrate up
+```
+
+- Применить миграции лестницей (staircase):
+
+```bash
+DATABASE_DSN="postgres://postgres:postgres@localhost:5430/taskservice?sslmode=disable" go run ./cmd/migrate staircase
+```
+
+- Сидирование базы (если таблица `tasks` пуста):
+
+```bash
+DATABASE_DSN="postgres://postgres:postgres@localhost:5430/taskservice?sslmode=disable" go run ./cmd/seed
+```
+
+Также эти команды доступны в контейнерах через `docker compose run`, например:
+
+```bash
+docker compose run --rm migrate /app/migrate up
+docker compose run --rm seed /app/seed
+```
+
+## Интеграционные тесты
+
+Интеграционные тесты против Postgres запускаются только если задана переменная окружения `TEST_DATABASE_DSN`.
+Пример запуска (после поднятия `postgres` через `docker compose up -d postgres`):
+
+```bash
+TEST_DATABASE_DSN="postgres://postgres:postgres@localhost:5430/taskservice?sslmode=disable" go test ./... -v
+```
+
+После тестов можно очистить том:
+
+```bash
+docker compose down -v
+```
+
+## Фичa: Периодичность задач (recurrence)
+
+Добавлены параметры периодичности задач и соответствующие проверки:
+
+- `None` — одноразовая задача
+- `DailyEveryN` — каждый N-й день (минимум 1)
+- `MonthlyDay` — конкретный день месяца (1..30)
+- `SpecificDates` — набор конкретных дат
+- `MonthParity` — чётные / нечётные дни
+
+API заметки:
+
+- `GET /api/v1/tasks?date=YYYY-MM-DD` — получить задачи, активные на указанную дату
+- `PATCH /api/v1/tasks/{id}` — частичное обновление (поддерживается явное `null` для `recurrence_start_date`)
+
+Валидация входящих запросов реализована в HTTP-слое (validator) и дополнительно проверяется в usecase при логической валидации recurrence-полей.
+
+## Прочее
+
+- Включён простой rate-limiter на HTTP-маршрутах (возвращает `429` при превышении).
+- Для разработки: `go test ./...`, `go vet ./...`, `go build ./...` — все пройдут при корректной среде.
