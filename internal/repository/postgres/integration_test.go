@@ -45,8 +45,6 @@ func TestMigrations_Staircase(t *testing.T) {
 		t.Logf("migrator version err: %v", verr)
 	}
 
-	// Run staircase: try stepping one-by-one, fallback to Up/Down if the
-	// file-source driver exhibits path-related edge-cases.
 	if err := staircase(m); err != nil {
 		t.Fatalf("staircase failed: %T: %v", err, err)
 	}
@@ -147,7 +145,6 @@ func TestRepository_ListByDate(t *testing.T) {
 }
 
 func staircase(m *migrate.Migrate) error {
-	// Try stepping up one migration at a time.
 	for {
 		err := m.Steps(1)
 		if err == nil {
@@ -156,9 +153,7 @@ func staircase(m *migrate.Migrate) error {
 		if errors.Is(err, migrate.ErrNoChange) {
 			break
 		}
-		// If the file driver reports path issues, fall back to Up/Down.
 		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "file does not exist") {
-			// fallback: apply all then revert
 			if upErr := m.Up(); upErr != nil {
 				if !errors.Is(upErr, migrate.ErrNoChange) {
 					return fmt.Errorf("staircase fallback up failed: %w (orig: %v)", upErr, err)
@@ -172,7 +167,6 @@ func staircase(m *migrate.Migrate) error {
 		return err
 	}
 
-	// Then step down one migration at a time.
 	for {
 		err := m.Steps(-1)
 		if err == nil {
@@ -196,10 +190,6 @@ func staircase(m *migrate.Migrate) error {
 func newMigrator(t *testing.T, dsn string) *migrate.Migrate {
 	t.Helper()
 
-	// Copy migrations to a temporary directory without special characters
-	// in the path, then point the file source at that directory. This
-	// avoids issues with url-escaping on paths that contain spaces or
-	// characters like '&'.
 	migrationsDir := filepath.Join(repoRoot(t), "migrations")
 	tmpDir, err := os.MkdirTemp("", "migrations-")
 	if err != nil {
@@ -223,7 +213,6 @@ func newMigrator(t *testing.T, dsn string) *migrate.Migrate {
 		}
 	}
 
-	// Log copied files for debugging
 	copied, err := os.ReadDir(tmpDir)
 	if err != nil {
 		t.Fatalf("read tmp dir: %v", err)
@@ -234,7 +223,6 @@ func newMigrator(t *testing.T, dsn string) *migrate.Migrate {
 	}
 	t.Logf("copied migrations: %v", names)
 
-	// Ensure trailing slash for directory URL
 	sourceURL := "file://" + tmpDir + "/"
 	t.Logf("migrationsDir=%s sourceURL=%s (tmp)", migrationsDir, sourceURL)
 	m, err := migrate.New(sourceURL, dsn)
