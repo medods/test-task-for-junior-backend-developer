@@ -53,7 +53,6 @@ http://localhost:8080/swagger/openapi.json
 - `GET /api/v1/tasks?date=YYYY-MM-DD`
 - `GET /api/v1/tasks/{id}`
 - `PUT /api/v1/tasks/{id}`
-- `PATCH /api/v1/tasks/{id}`
 - `DELETE /api/v1/tasks/{id}`
 
 ## Миграции и сидирование
@@ -134,7 +133,7 @@ make test-integration # интеграционные тесты (поднима�
 API заметки:
 
 - `GET /api/v1/tasks?date=YYYY-MM-DD` — получить задачи, активные на указанную дату
-- `PATCH /api/v1/tasks/{id}` — частичное обновление (поддерживается явное `null` для `recurrence_start_date`)
+ - `PUT /api/v1/tasks/{id}` — полное обновление. В Swagger UI поля заполняются как RequestParams (query parameters): `title`, `description`, `status`, `recurrence_type`, `recurrence_payload` (JSON-encoded string), `recurrence_start_date` (YYYY-MM-DD).
 
 Валидация входящих запросов реализована в HTTP-слое (validator) и дополнительно проверяется в usecase при логической валидации recurrence-полей.
 

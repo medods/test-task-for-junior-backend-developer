@@ -24,7 +24,6 @@ type Usecase interface {
 	Create(ctx context.Context, input CreateInput) (*task.Task, error)
 	GetByID(ctx context.Context, id int64) (*task.Task, error)
 	Update(ctx context.Context, id int64, input UpdateInput) (*task.Task, error)
-	Patch(ctx context.Context, id int64, input PatchInput) (*task.Task, error)
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context) ([]task.Task, error)
 	ListByDate(ctx context.Context, date time.Time) ([]task.Task, error)
@@ -50,14 +49,4 @@ type UpdateInput struct {
 	RecurrenceStartDate *common.DateType
 }
 
-// PatchInput is input for partially updating a task.
-type PatchInput struct {
-	Title             *string
-	Description       *string
-	Status            *task.Status
-	RecurrenceType    *recurrence.RecurrenceType
-	RecurrencePayload *recurrence.RecurrencePayload
 
-	RecurrenceStartDate    *common.DateType
-	RecurrenceStartDateSet bool
-}

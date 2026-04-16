@@ -108,49 +108,45 @@
             "in": "path",
             "required": true,
             "schema": { "type": "integer", "format": "int64", "minimum": 1 }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/UpdateTaskRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated task",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Task" }
-              }
-            }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/TooManyRequests" }
-        }
-      },
-      "patch": {
-        "tags": ["Tasks"],
-        "summary": "Patch task",
-        "parameters": [
           {
-            "name": "id",
-            "in": "path",
+            "name": "title",
+            "in": "query",
             "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+            "schema": { "type": "string", "maxLength": 128 }
+          },
+          {
+            "name": "description",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "maxLength": 512 }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["new", "in_progress", "done"] }
+          },
+          {
+            "name": "recurrence_type",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["none", "daily_every_n", "monthly_day", "specific_dates", "month_parity"] }
+          },
+          {
+            "name": "recurrence_payload",
+            "in": "query",
+            "required": true,
+            "description": "JSON object encoded as string, e.g. {\"interval_days\":2}",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "recurrence_start_date",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date", "example": "2026-03-24" }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/PatchTaskRequest" }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Updated task",
@@ -165,6 +161,7 @@
           "429": { "$ref": "#/components/responses/TooManyRequests" }
         }
       },
+      
       "delete": {
         "tags": ["Tasks"],
         "summary": "Delete task",
@@ -275,17 +272,7 @@
           }
         }
       },
-      "PatchTaskRequest": {
-        "type": "object",
-        "properties": {
-          "title": { "type": "string", "maxLength": 128 },
-          "description": { "type": "string", "maxLength": 512 },
-          "status": { "type": "string", "enum": ["new", "in_progress", "done"] },
-          "recurrence_type": { "type": "string", "enum": ["none", "daily_every_n", "monthly_day", "specific_dates", "month_parity"] },
-          "recurrence_payload": { "$ref": "#/components/schemas/RecurrencePayload" },
-          "recurrence_start_date": { "type": "string", "format": "date", "nullable": true }
-        }
-      },
+      
       "Task": {
         "type": "object",
         "properties": {

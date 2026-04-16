@@ -2,7 +2,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 	"example.com/taskservice/internal/domain/common"
 	task "example.com/taskservice/internal/domain/task"
 	taskusecase "example.com/taskservice/internal/usecase/task"
+	"example.com/taskservice/internal/domain/recurrence"
 )
 
 // TaskHandler handles task HTTP requests.
@@ -82,24 +82,53 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	// Read update fields from query parameters (RequestParam style).
+	q := r.URL.Query()
+	title := q.Get("title")
+	description := q.Get("description")
+	statusStr := q.Get("status")
+	rtStr := q.Get("recurrence_type")
+	rpStr := q.Get("recurrence_payload")
+	rsd := q.Get("recurrence_start_date")
 
-	var req taskMutationDTO
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
+	if title == "" || statusStr == "" || rtStr == "" || rpStr == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("missing required update parameters: title,status,recurrence_type,recurrence_payload"))
 		return
 	}
-	if err := requestValidator.Struct(req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
+
+	status := task.Status(statusStr)
+	if !status.Valid() {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid status"))
 		return
+	}
+
+	rt := recurrence.RecurrenceType(rtStr)
+
+	// We accept recurrence_payload as JSON in a query param.
+	var rpValue recurrence.RecurrencePayload
+	if err := json.Unmarshal([]byte(rpStr), &rpValue); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid recurrence_payload: %w", err))
+		return
+	}
+
+	var startDate *common.DateType
+	if rsd != "" {
+		parsed, err := time.Parse(common.DateLayout, rsd)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid recurrence_start_date, expected YYYY-MM-DD"))
+			return
+		}
+		d := common.NewDate(parsed.UTC())
+		startDate = &d
 	}
 
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
-		Title:               req.Title,
-		Description:         req.Description,
-		Status:              req.Status,
-		RecurrenceType:      req.RecurrenceType,
-		RecurrencePayload:   req.RecurrencePayload,
-		RecurrenceStartDate: req.RecurrenceStartDate,
+		Title:               title,
+		Description:         description,
+		Status:              status,
+		RecurrenceType:      rt,
+		RecurrencePayload:   rpValue,
+		RecurrenceStartDate: startDate,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -110,53 +139,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 // Patch handles PATCH /tasks/{id}.
-func (h *TaskHandler) Patch(w http.ResponseWriter, r *http.Request) {
-	id, err := getIDFromRequest(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-
-	var req taskPatchDTO
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := requestValidator.Struct(req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-
-	input := taskusecase.PatchInput{
-		Title:             req.Title,
-		Description:       req.Description,
-		Status:            req.Status,
-		RecurrenceType:    req.RecurrenceType,
-		RecurrencePayload: req.RecurrencePayload,
-	}
-
-	if req.RecurrenceStartDate != nil {
-		input.RecurrenceStartDateSet = true
-
-		raw := bytes.TrimSpace(req.RecurrenceStartDate)
-		if string(raw) != "null" {
-			var d common.DateType
-			if err := json.Unmarshal(raw, &d); err != nil {
-				writeError(w, http.StatusBadRequest, err)
-				return
-			}
-			input.RecurrenceStartDate = &d
-		}
-	}
-
-	updated, err := h.usecase.Patch(r.Context(), id, input)
-	if err != nil {
-		writeUsecaseError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusOK, newTaskDTO(updated))
-}
+// Patch removed: partial updates are not supported; use PUT /tasks/{id} with RequestParams.
 
 // Delete handles DELETE /tasks/{id}.
 func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {

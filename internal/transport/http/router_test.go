@@ -28,9 +28,6 @@ func (m *mockUsecase) GetByID(ctx context.Context, id int64) (*domaintask.Task, 
 func (m *mockUsecase) Update(ctx context.Context, id int64, input taskusecase.UpdateInput) (*domaintask.Task, error) {
 	return m.GetByID(ctx, id)
 }
-func (m *mockUsecase) Patch(ctx context.Context, id int64, input taskusecase.PatchInput) (*domaintask.Task, error) {
-	return m.GetByID(ctx, id)
-}
 func (m *mockUsecase) Delete(ctx context.Context, id int64) error { return nil }
 func (m *mockUsecase) List(ctx context.Context) ([]domaintask.Task, error) {
 	now := time.Now().UTC()

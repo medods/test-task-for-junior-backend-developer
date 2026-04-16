@@ -154,9 +154,10 @@ func TestValidateUpdateInput_MonthlyDay_RequiresMonthDay(t *testing.T) {
 	}
 }
 
-func TestServicePatch_NoFieldsToUpdate(t *testing.T) {
+func TestServiceUpdate_InvalidInput(t *testing.T) {
 	s := NewService(nil)
-	_, err := s.Patch(context.Background(), 1, PatchInput{})
+	// Update requires title; empty title should produce ErrInvalidInput
+	_, err := s.Update(context.Background(), 1, UpdateInput{})
 	if err == nil {
 		t.Fatalf("expected error")
 	}

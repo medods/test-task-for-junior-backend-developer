@@ -41,9 +41,6 @@ func (m *mockUsecase) GetByID(ctx context.Context, id int64) (*taskdomain.Task, 
 func (m *mockUsecase) Update(ctx context.Context, id int64, input taskusecase.UpdateInput) (*taskdomain.Task, error) {
 	return m.GetByID(ctx, id)
 }
-func (m *mockUsecase) Patch(ctx context.Context, id int64, input taskusecase.PatchInput) (*taskdomain.Task, error) {
-	return m.GetByID(ctx, id)
-}
 func (m *mockUsecase) Delete(ctx context.Context, id int64) error { return nil }
 func (m *mockUsecase) List(ctx context.Context) ([]taskdomain.Task, error) {
 	now := time.Now().UTC()
@@ -98,18 +95,16 @@ func TestGetListHandlers(t *testing.T) {
 	}
 }
 
-func TestPatchHandlerNullStartDate(t *testing.T) {
+func TestUpdateHandler_QueryParams(t *testing.T) {
 	h := NewTaskHandler(&mockUsecase{})
 
-	payload := map[string]any{"title": "x", "recurrence_start_date": nil}
-	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPatch, "/tasks/1", bytes.NewReader(b))
+	// Use query parameters for update (RequestParam style)
+	req := httptest.NewRequest(http.MethodPut, "/tasks/1?title=x&status=new&recurrence_type=none&recurrence_payload=%7B%7D", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
-	router.HandleFunc("/tasks/{id}", h.Patch).Methods("PATCH")
+	router.HandleFunc("/tasks/{id}", h.Update).Methods("PUT")
 	router.ServeHTTP(rr, req)
-	req.Header.Set("Content-Type", "application/json")
 	if rr.Code != http.StatusOK {
-		t.Fatalf("Patch status %d body=%s", rr.Code, rr.Body.String())
+		t.Fatalf("Update status %d body=%s", rr.Code, rr.Body.String())
 	}
 }

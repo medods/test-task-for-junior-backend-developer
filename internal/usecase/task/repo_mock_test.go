@@ -138,13 +138,21 @@ func TestService_CRUD_and_ListByDate(t *testing.T) {
 		t.Fatalf("update not applied")
 	}
 
-	title := "patched"
-	patched, err := s.Patch(ctx, created.ID, PatchInput{Title: &title})
-	if err != nil {
-		t.Fatalf("patch err: %v", err)
+	// Use Update (full replacement) instead of Patch
+	upd2 := UpdateInput{
+		Title:               "patched",
+		Description:         created.Description,
+		Status:              created.Status,
+		RecurrenceType:      created.RecurrenceType,
+		RecurrencePayload:   created.RecurrencePayload,
+		RecurrenceStartDate: created.RecurrenceStartDate,
 	}
-	if patched.Title != title {
-		t.Fatalf("patch not applied")
+	patched, err := s.Update(ctx, created.ID, upd2)
+	if err != nil {
+		t.Fatalf("update err: %v", err)
+	}
+	if patched.Title != "patched" {
+		t.Fatalf("update not applied")
 	}
 
 	if err := s.Delete(ctx, created.ID); err != nil {
