@@ -1,3 +1,4 @@
+version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
@@ -42,32 +43,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      HTTP_ADDR: :8080
-      DATABASE_DSN: postgres://postgres:postgres@postgres:5432/taskservice?sslmode=disable
-    ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-      seed:
-        condition: service_completed_successfull
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["/app/seed"]
-    environment:
-      DATABASE_DSN: postgres://postgres:postgres@postgres:5432/taskservice?sslmode=disable
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    command: ["/app/taskservice"]
     environment:
       HTTP_ADDR: :8080
       DATABASE_DSN: postgres://postgres:postgres@postgres:5432/taskservice?sslmode=disable

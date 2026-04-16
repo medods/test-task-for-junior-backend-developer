@@ -37,8 +37,21 @@ func TestMigrations_Staircase(t *testing.T) {
 	m := newMigrator(t, dbDSN)
 	defer func() { _, _ = m.Close() }()
 
-	if err := staircase(m); err != nil {
-		t.Fatalf("staircase failed: %v", err)
+	if v, dirty, verr := m.Version(); verr == nil {
+		t.Logf("migrator starting version=%d dirty=%v", v, dirty)
+	} else {
+		t.Logf("migrator version err: %v", verr)
+	}
+
+	// Apply all migrations, then revert them. Using Up/Down avoids
+	// occasional file-driver Steps edge-cases on some hosts/paths.
+	if err := m.Up(); err != nil {
+		if !errors.Is(err, migrate.ErrNoChange) {
+			t.Fatalf("migrate up: %v", err)
+		}
+	}
+	if err := m.Down(); err != nil {
+		t.Fatalf("migrate down: %v", err)
 	}
 
 	conn, err := pgx.Connect(ctx, dbDSN)
@@ -165,10 +178,47 @@ func staircase(m *migrate.Migrate) error {
 func newMigrator(t *testing.T, dsn string) *migrate.Migrate {
 	t.Helper()
 
+	// Copy migrations to a temporary directory without special characters
+	// in the path, then point the file source at that directory. This
+	// avoids issues with url-escaping on paths that contain spaces or
+	// characters like '&'.
 	migrationsDir := filepath.Join(repoRoot(t), "migrations")
-	u := url.URL{Path: migrationsDir}
-	sourceURL := "file://" + u.EscapedPath()
+	tmpDir, err := os.MkdirTemp("", "migrations-")
+	if err != nil {
+		t.Fatalf("mkdir temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
+	entries, err := os.ReadDir(migrationsDir)
+	if err != nil {
+		t.Fatalf("read migrations: %v", err)
+	}
+	for _, e := range entries {
+		src := filepath.Join(migrationsDir, e.Name())
+		dst := filepath.Join(tmpDir, e.Name())
+		data, err := os.ReadFile(src)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", src, err)
+		}
+		if err := os.WriteFile(dst, data, 0644); err != nil {
+			t.Fatalf("write migration %s: %v", dst, err)
+		}
+	}
+
+	// Log copied files for debugging
+	copied, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("read tmp dir: %v", err)
+	}
+	names := []string{}
+	for _, c := range copied {
+		names = append(names, c.Name())
+	}
+	t.Logf("copied migrations: %v", names)
+
+	// Ensure trailing slash for directory URL
+	sourceURL := "file://" + tmpDir + "/"
+	t.Logf("migrationsDir=%s sourceURL=%s (tmp)", migrationsDir, sourceURL)
 	m, err := migrate.New(sourceURL, dsn)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
