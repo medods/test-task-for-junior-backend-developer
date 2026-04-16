@@ -18,8 +18,8 @@ services:
 
   migrate:
     build:
-      context: ./docker/migrator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/migrator/Dockerfile
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/taskservice?sslmode=disable
       TEST_DATABASE_URL: postgres://postgres:postgres@postgres:5432/taskservice_test?sslmode=disable
