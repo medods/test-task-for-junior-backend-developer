@@ -133,7 +133,7 @@ make test-integration # интеграционные тесты (поднима�
 API заметки:
 
 - `GET /api/v1/tasks?date=YYYY-MM-DD` — получить задачи, активные на указанную дату
- - `PUT /api/v1/tasks/{id}` — полное обновление. В Swagger UI поля заполняются как RequestParams (query parameters): `title`, `description`, `status`, `recurrence_type`, `recurrence_payload` (JSON-encoded string), `recurrence_start_date` (YYYY-MM-DD).
+ - `PUT /api/v1/tasks/{id}` — полное обновление. Ожидает JSON в теле запроса с полями: `title`, `description`, `status`, `recurrence_type`, `recurrence_payload`, `recurrence_start_date` (YYYY-MM-DD).
 
 Валидация входящих запросов реализована в HTTP-слое (validator) и дополнительно проверяется в usecase при логической валидации recurrence-полей.
 

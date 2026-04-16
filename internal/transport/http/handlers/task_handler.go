@@ -15,7 +15,6 @@ import (
 	"example.com/taskservice/internal/domain/common"
 	task "example.com/taskservice/internal/domain/task"
 	taskusecase "example.com/taskservice/internal/usecase/task"
-	"example.com/taskservice/internal/domain/recurrence"
 )
 
 // TaskHandler handles task HTTP requests.
@@ -82,53 +81,23 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	// Read update fields from query parameters (RequestParam style).
-	q := r.URL.Query()
-	title := q.Get("title")
-	description := q.Get("description")
-	statusStr := q.Get("status")
-	rtStr := q.Get("recurrence_type")
-	rpStr := q.Get("recurrence_payload")
-	rsd := q.Get("recurrence_start_date")
-
-	if title == "" || statusStr == "" || rtStr == "" || rpStr == "" {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("missing required update parameters: title,status,recurrence_type,recurrence_payload"))
+	var req taskMutationDTO
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-
-	status := task.Status(statusStr)
-	if !status.Valid() {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid status"))
+	if err := requestValidator.Struct(req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
 		return
-	}
-
-	rt := recurrence.RecurrenceType(rtStr)
-
-	// We accept recurrence_payload as JSON in a query param.
-	var rpValue recurrence.RecurrencePayload
-	if err := json.Unmarshal([]byte(rpStr), &rpValue); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid recurrence_payload: %w", err))
-		return
-	}
-
-	var startDate *common.DateType
-	if rsd != "" {
-		parsed, err := time.Parse(common.DateLayout, rsd)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid recurrence_start_date, expected YYYY-MM-DD"))
-			return
-		}
-		d := common.NewDate(parsed.UTC())
-		startDate = &d
 	}
 
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
-		Title:               title,
-		Description:         description,
-		Status:              status,
-		RecurrenceType:      rt,
-		RecurrencePayload:   rpValue,
-		RecurrenceStartDate: startDate,
+		Title:               req.Title,
+		Description:         req.Description,
+		Status:              req.Status,
+		RecurrenceType:      req.RecurrenceType,
+		RecurrencePayload:   req.RecurrencePayload,
+		RecurrenceStartDate: req.RecurrenceStartDate,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)

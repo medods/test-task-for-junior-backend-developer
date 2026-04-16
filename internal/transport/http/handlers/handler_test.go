@@ -97,9 +97,11 @@ func TestGetListHandlers(t *testing.T) {
 
 func TestUpdateHandler_QueryParams(t *testing.T) {
 	h := NewTaskHandler(&mockUsecase{})
-
-	// Use query parameters for update (RequestParam style)
-	req := httptest.NewRequest(http.MethodPut, "/tasks/1?title=x&status=new&recurrence_type=none&recurrence_payload=%7B%7D", nil)
+	// Use JSON body for update
+	body := map[string]any{"title": "x", "description": "d", "status": "new", "recurrence_type": "none", "recurrence_payload": map[string]any{}}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPut, "/tasks/1", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
 	router.HandleFunc("/tasks/{id}", h.Update).Methods("PUT")
