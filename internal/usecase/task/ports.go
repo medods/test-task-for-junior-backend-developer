@@ -48,5 +48,3 @@ type UpdateInput struct {
 	RecurrencePayload   recurrence.RecurrencePayload
 	RecurrenceStartDate *common.DateType
 }
-
-

@@ -95,9 +95,8 @@ func TestGetListHandlers(t *testing.T) {
 	}
 }
 
-func TestUpdateHandler_QueryParams(t *testing.T) {
+func TestUpdateHandler(t *testing.T) {
 	h := NewTaskHandler(&mockUsecase{})
-	// Use JSON body for update
 	body := map[string]any{"title": "x", "description": "d", "status": "new", "recurrence_type": "none", "recurrence_payload": map[string]any{}}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPut, "/tasks/1", bytes.NewReader(b))

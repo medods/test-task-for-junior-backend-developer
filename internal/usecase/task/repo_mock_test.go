@@ -138,7 +138,6 @@ func TestService_CRUD_and_ListByDate(t *testing.T) {
 		t.Fatalf("update not applied")
 	}
 
-	// Use Update (full replacement) instead of Patch
 	upd2 := UpdateInput{
 		Title:               "patched",
 		Description:         created.Description,

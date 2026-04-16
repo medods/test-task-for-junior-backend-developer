@@ -92,8 +92,6 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 	return updated, nil
 }
 
-
-
 // Delete removes a task by id.
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {

@@ -107,9 +107,6 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, newTaskDTO(updated))
 }
 
-// Patch handles PATCH /tasks/{id}.
-// Patch removed: partial updates are not supported; use PUT /tasks/{id} with RequestParams.
-
 // Delete handles DELETE /tasks/{id}.
 func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromRequest(r)
