@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Task Service API",
-    "version": "1.0.0",
-    "description": "CRUD API for tasks built with clean architecture."
+    "version": "1.1.0",
+    "description": "CRUD API for tasks with recurrence support, built with clean architecture."
   },
   "servers": [
     {
@@ -13,7 +13,11 @@
   "tags": [
     {
       "name": "Tasks",
-      "description": "Operations with tasks"
+      "description": "Single-task operations"
+    },
+    {
+      "name": "Recurring Tasks",
+      "description": "Operations for creating and managing recurring (periodic) task series"
     }
   ],
   "paths": {
@@ -21,6 +25,15 @@
       "get": {
         "tags": ["Tasks"],
         "summary": "List tasks",
+        "parameters": [
+          {
+            "name": "recurrence_group_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter by recurrence group UUID to retrieve all instances of a recurring series.",
+            "schema": { "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Task list",
@@ -37,7 +50,7 @@
       },
       "post": {
         "tags": ["Tasks"],
-        "summary": "Create task",
+        "summary": "Create a single task",
         "requestBody": {
           "required": true,
           "content": {
@@ -131,6 +144,113 @@
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
+    },
+    "/api/v1/tasks/recurring": {
+      "post": {
+        "tags": ["Recurring Tasks"],
+        "summary": "Create a series of recurring tasks",
+        "description": "Expands a recurrence rule into individual task instances (one per matching date) and persists them atomically. All instances share a `recurrence_group_id`.\n\n**Recurrence types**\n| Type | Required fields |\n|---|---|\n| `daily` | `every_n_days` (≥1), `start_date`, `end_date` |\n| `monthly` | `days_of_month` (1–30 each), `start_date`, `end_date` |\n| `specific_dates` | `dates` (array of YYYY-MM-DD) |\n| `even_odd` | `parity` (\"even\"\\|\"odd\"), `start_date`, `end_date` |\n\nMaximum **366 instances** per request.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateRecurringTaskRequest" },
+              "examples": {
+                "daily": {
+                  "summary": "Every 2 days for a month",
+                  "value": {
+                    "title": "Patient rounds",
+                    "description": "Daily ward rounds",
+                    "recurrence": {
+                      "type": "daily",
+                      "every_n_days": 2,
+                      "start_date": "2024-10-01",
+                      "end_date": "2024-10-31"
+                    }
+                  }
+                },
+                "monthly": {
+                  "summary": "1st and 15th of each month",
+                  "value": {
+                    "title": "Biweekly report",
+                    "recurrence": {
+                      "type": "monthly",
+                      "days_of_month": [1, 15],
+                      "start_date": "2024-10-01",
+                      "end_date": "2024-12-31"
+                    }
+                  }
+                },
+                "specific_dates": {
+                  "summary": "On exactly these dates",
+                  "value": {
+                    "title": "Follow-up call",
+                    "recurrence": {
+                      "type": "specific_dates",
+                      "dates": ["2024-10-05", "2024-10-19", "2024-11-02"]
+                    }
+                  }
+                },
+                "even_odd": {
+                  "summary": "Even days of the month",
+                  "value": {
+                    "title": "Inventory check",
+                    "recurrence": {
+                      "type": "even_odd",
+                      "parity": "even",
+                      "start_date": "2024-10-01",
+                      "end_date": "2024-10-31"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "All created task instances",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateRecurringTaskResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/v1/tasks/recurring/{group_id}": {
+      "delete": {
+        "tags": ["Recurring Tasks"],
+        "summary": "Delete all tasks in a recurrence group",
+        "description": "Deletes every task that shares the given `recurrence_group_id`. Useful for cancelling an entire recurring series.",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Number of tasks deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": { "type": "integer", "format": "int64", "example": 15 }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
     }
   },
   "components": {
@@ -157,18 +277,19 @@
         "type": "object",
         "required": ["title"],
         "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
+          "title": { "type": "string", "example": "Prepare release" },
+          "description": { "type": "string", "example": "Collect release notes and check migrations" },
           "status": {
             "type": "string",
-            "enum": ["new", "in_progress", "done"],
+            "enum": ["new", "in_progress", "done", "canceled"],
             "example": "new"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2024-10-15T09:00:00Z",
+            "description": "Optional date/time when this task is due."
           }
         }
       },
@@ -176,19 +297,32 @@
         "type": "object",
         "required": ["title", "status"],
         "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
+          "title": { "type": "string", "example": "Prepare release" },
+          "description": { "type": "string", "example": "Collect release notes and check migrations" },
           "status": {
             "type": "string",
-            "enum": ["new", "in_progress", "done"],
+            "enum": ["new", "in_progress", "done", "canceled"],
             "example": "in_progress"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2024-10-15T09:00:00Z"
           }
+        }
+      },
+      "RecurrenceConfig": {
+        "type": "object",
+        "description": "The recurrence rule that was used to generate this task instance.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["daily", "monthly", "specific_dates", "even_odd"]
+          },
+          "every_n_days": { "type": "integer", "example": 1 },
+          "days_of_month": { "type": "array", "items": { "type": "integer" }, "example": [1, 15] },
+          "parity": { "type": "string", "enum": ["even", "odd"] }
         }
       },
       "Task": {
@@ -196,24 +330,101 @@
         "properties": {
           "id": { "type": "integer", "format": "int64", "example": 1 },
           "title": { "type": "string", "example": "Prepare release" },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
+          "description": { "type": "string", "example": "Collect release notes and check migrations" },
           "status": {
             "type": "string",
-            "enum": ["new", "in_progress", "done"],
+            "enum": ["new", "in_progress", "done", "canceled"],
             "example": "new"
           },
-          "created_at": {
+          "scheduled_at": {
             "type": "string",
             "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
+            "nullable": true,
+            "example": "2024-10-15T00:00:00Z"
           },
-          "updated_at": {
+          "recurrence_group_id": {
             "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
+            "nullable": true,
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "description": "UUID shared by all tasks that belong to the same recurring series."
+          },
+          "recurrence": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/RecurrenceConfig" }]
+          },
+          "created_at": { "type": "string", "format": "date-time", "example": "2026-03-24T00:00:00Z" },
+          "updated_at": { "type": "string", "format": "date-time", "example": "2026-03-24T00:00:00Z" }
+        }
+      },
+      "RecurrenceRequest": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["daily", "monthly", "specific_dates", "even_odd"],
+            "description": "Recurrence strategy."
+          },
+          "every_n_days": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 1,
+            "description": "Interval in days. Required for type=daily."
+          },
+          "days_of_month": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 1, "maximum": 30 },
+            "example": [1, 15],
+            "description": "Calendar days. Required for type=monthly."
+          },
+          "parity": {
+            "type": "string",
+            "enum": ["even", "odd"],
+            "description": "Required for type=even_odd."
+          },
+          "dates": {
+            "type": "array",
+            "items": { "type": "string", "format": "date", "example": "2024-10-05" },
+            "description": "Explicit date list (YYYY-MM-DD). Required for type=specific_dates."
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-10-01",
+            "description": "Inclusive start (YYYY-MM-DD). Required for daily, monthly, even_odd."
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-10-31",
+            "description": "Inclusive end (YYYY-MM-DD). Required for daily, monthly, even_odd."
+          }
+        }
+      },
+      "CreateRecurringTaskRequest": {
+        "type": "object",
+        "required": ["title", "recurrence"],
+        "properties": {
+          "title": { "type": "string", "example": "Daily ward rounds" },
+          "description": { "type": "string", "example": "Check on all patients in ward B" },
+          "status": {
+            "type": "string",
+            "enum": ["new", "in_progress", "done", "canceled"],
+            "default": "new"
+          },
+          "recurrence": { "$ref": "#/components/schemas/RecurrenceRequest" }
+        }
+      },
+      "CreateRecurringTaskResponse": {
+        "type": "object",
+        "properties": {
+          "recurrence_group_id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "tasks": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Task" }
           }
         }
       },
