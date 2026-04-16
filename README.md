@@ -85,6 +85,8 @@ docker compose run --rm migrate /app/migrate up
 docker compose run --rm seed /app/seed
 ```
 
+Процесс миграций в CI/контейнерной среде реализован как "staircase" и оркестрируется с помощью `seqwall` — в проекте есть собранный образ мигратора (`docker/migrator/Dockerfile`) и скрипты, которые последовательно выполняют проверочные шаги (actualise, down-up-down, reapply) перед финальным применением миграций к базе.
+
 ## Интеграционные тесты
 
 Интеграционные тесты против Postgres запускаются только если задана переменная окружения `TEST_DATABASE_DSN`.
