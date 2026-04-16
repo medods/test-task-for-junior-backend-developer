@@ -1,36 +1,53 @@
+// Package handlers contains HTTP handlers for the API.
 package handlers
 
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 
-	taskdomain "example.com/taskservice/internal/domain/task"
+	"example.com/taskservice/internal/domain/common"
+	task "example.com/taskservice/internal/domain/task"
 	taskusecase "example.com/taskservice/internal/usecase/task"
 )
 
+// TaskHandler handles task HTTP requests.
 type TaskHandler struct {
 	usecase taskusecase.Usecase
 }
 
+var requestValidator = validator.New()
+
+// NewTaskHandler creates a TaskHandler.
 func NewTaskHandler(usecase taskusecase.Usecase) *TaskHandler {
 	return &TaskHandler{usecase: usecase}
 }
 
+// Create handles POST /tasks.
 func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req taskMutationDTO
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := requestValidator.Struct(req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:               req.Title,
+		Description:         req.Description,
+		Status:              req.Status,
+		RecurrenceType:      req.RecurrenceType,
+		RecurrencePayload:   req.RecurrencePayload,
+		RecurrenceStartDate: req.RecurrenceStartDate,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -40,6 +57,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, newTaskDTO(created))
 }
 
+// GetByID handles GET /tasks/{id}.
 func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromRequest(r)
 	if err != nil {
@@ -56,23 +74,30 @@ func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, newTaskDTO(task))
 }
 
+// Update handles PUT /tasks/{id}.
 func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromRequest(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-
 	var req taskMutationDTO
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := requestValidator.Struct(req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:               req.Title,
+		Description:         req.Description,
+		Status:              req.Status,
+		RecurrenceType:      req.RecurrenceType,
+		RecurrencePayload:   req.RecurrencePayload,
+		RecurrenceStartDate: req.RecurrenceStartDate,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -82,6 +107,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, newTaskDTO(updated))
 }
 
+// Delete handles DELETE /tasks/{id}.
 func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := getIDFromRequest(r)
 	if err != nil {
@@ -97,11 +123,31 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// List handles GET /tasks and supports filtering by date via ?date=YYYY-MM-DD.
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.usecase.List(r.Context())
-	if err != nil {
-		writeUsecaseError(w, err)
-		return
+	requestDate := r.URL.Query().Get("date")
+	tasks := make([]task.Task, 0)
+	var err error
+
+	if requestDate != "" {
+		parsed, err := time.Parse(common.DateLayout, requestDate)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid date, expected YYYY-MM-DD"))
+			return
+		}
+
+		normalized := common.NewDate(parsed.UTC())
+		tasks, err = h.usecase.ListByDate(r.Context(), normalized.Time)
+		if err != nil {
+			writeUsecaseError(w, err)
+			return
+		}
+	} else {
+		tasks, err = h.usecase.List(r.Context())
+		if err != nil {
+			writeUsecaseError(w, err)
+			return
+		}
 	}
 
 	response := make([]taskDTO, 0, len(tasks))
@@ -143,7 +189,7 @@ func decodeJSON(r *http.Request, dst any) error {
 
 func writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, taskdomain.ErrNotFound):
+	case errors.Is(err, task.ErrNotFound):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, taskusecase.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err)

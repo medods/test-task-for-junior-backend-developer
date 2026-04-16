@@ -1,3 +1,4 @@
+// Package docs serves the embedded OpenAPI spec and Swagger UI.
 package docs
 
 import (
@@ -8,10 +9,12 @@ import (
 //go:embed openapi.json
 var openAPISpec embed.FS
 
+// Handler serves OpenAPI spec and Swagger UI assets.
 type Handler struct {
 	spec []byte
 }
 
+// NewHandler loads the embedded OpenAPI spec.
 func NewHandler() *Handler {
 	spec, err := openAPISpec.ReadFile("openapi.json")
 	if err != nil {
@@ -21,6 +24,7 @@ func NewHandler() *Handler {
 	return &Handler{spec: spec}
 }
 
+// ServeSpec serves the OpenAPI JSON document.
 func (h *Handler) ServeSpec(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -29,6 +33,7 @@ func (h *Handler) ServeSpec(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(h.spec)
 }
 
+// ServeUI serves the Swagger UI HTML page.
 func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
@@ -36,6 +41,7 @@ func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(swaggerUIHTML))
 }
 
+// RedirectToUI redirects /swagger to /swagger/.
 func (h *Handler) RedirectToUI(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/swagger/", http.StatusMovedPermanently)
 }

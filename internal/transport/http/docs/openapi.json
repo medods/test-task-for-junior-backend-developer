@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Task Service API",
-    "version": "1.0.0",
-    "description": "CRUD API for tasks built with clean architecture."
+    "version": "1.1.0",
+    "description": "CRUD API for tasks with recurrence support."
   },
   "servers": [
     {
@@ -21,6 +21,19 @@
       "get": {
         "tags": ["Tasks"],
         "summary": "List tasks",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "Filter tasks active on this date (YYYY-MM-DD)",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-03-24"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Task list",
@@ -32,7 +45,8 @@
                 }
               }
             }
-          }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
         }
       },
       "post": {
@@ -55,7 +69,8 @@
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" }
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
         }
       }
     },
@@ -80,7 +95,8 @@
               }
             }
           },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
         }
       },
       "put": {
@@ -112,9 +128,11 @@
             }
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
         }
       },
+      
       "delete": {
         "tags": ["Tasks"],
         "summary": "Delete task",
@@ -128,7 +146,8 @@
         ],
         "responses": {
           "204": { "description": "Deleted" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
         }
       }
     }
@@ -150,71 +169,93 @@
             "schema": { "$ref": "#/components/schemas/Error" }
           }
         }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
       }
     },
     "schemas": {
+      "RecurrencePayload": {
+        "type": "object",
+        "description": "Fields depend on recurrence_type",
+        "additionalProperties": false,
+        "properties": {
+          "interval_days": { "type": "integer", "minimum": 1, "example": 2 },
+          "month_day": { "type": "integer", "minimum": 1, "maximum": 30, "example": 15 },
+          "specific_dates": {
+            "type": "array",
+            "items": { "type": "string", "format": "date" },
+            "example": ["2026-01-03", "2026-01-05"]
+          },
+          "parity": {
+            "type": "string",
+            "enum": ["none", "even", "odd"],
+            "example": "even"
+          }
+        }
+      },
       "CreateTaskRequest": {
         "type": "object",
-        "required": ["title"],
+        "required": ["title", "recurrence_type", "recurrence_payload"],
         "properties": {
-          "title": {
+          "title": { "type": "string", "maxLength": 128, "example": "Prepare release" },
+          "description": { "type": "string", "maxLength": 512, "example": "Collect release notes and check migrations" },
+          "status": { "type": "string", "enum": ["new", "in_progress", "done"], "example": "new" },
+          "recurrence_type": {
             "type": "string",
-            "example": "Prepare release"
+            "enum": ["none", "daily_every_n", "monthly_day", "specific_dates", "month_parity"],
+            "example": "daily_every_n"
           },
-          "description": {
+          "recurrence_payload": { "$ref": "#/components/schemas/RecurrencePayload" },
+          "recurrence_start_date": {
             "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
+            "format": "date",
+            "nullable": true,
+            "description": "Required when recurrence_type != none",
+            "example": "2026-03-24"
           }
         }
       },
       "UpdateTaskRequest": {
         "type": "object",
-        "required": ["title", "status"],
+        "required": ["title", "status", "recurrence_type", "recurrence_payload"],
         "properties": {
-          "title": {
+          "title": { "type": "string", "maxLength": 128, "example": "Prepare release" },
+          "description": { "type": "string", "maxLength": 512, "example": "Collect release notes and check migrations" },
+          "status": { "type": "string", "enum": ["new", "in_progress", "done"], "example": "in_progress" },
+          "recurrence_type": {
             "type": "string",
-            "example": "Prepare release"
+            "enum": ["none", "daily_every_n", "monthly_day", "specific_dates", "month_parity"],
+            "example": "daily_every_n"
           },
-          "description": {
+          "recurrence_payload": { "$ref": "#/components/schemas/RecurrencePayload" },
+          "recurrence_start_date": {
             "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "in_progress"
+            "format": "date",
+            "nullable": true,
+            "description": "Required when recurrence_type != none",
+            "example": "2026-03-24"
           }
         }
       },
+      
       "Task": {
         "type": "object",
         "properties": {
           "id": { "type": "integer", "format": "int64", "example": 1 },
-          "title": { "type": "string", "example": "Prepare release" },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          }
+          "title": { "type": "string", "maxLength": 128, "example": "Prepare release" },
+          "description": { "type": "string", "maxLength": 512, "example": "Collect release notes and check migrations" },
+          "status": { "type": "string", "enum": ["new", "in_progress", "done"], "example": "new" },
+          "created_at": { "type": "string", "format": "date-time", "example": "2026-03-24T00:00:00Z" },
+          "updated_at": { "type": "string", "format": "date-time", "example": "2026-03-24T00:00:00Z" },
+          "recurrence_type": { "type": "string", "enum": ["none", "daily_every_n", "monthly_day", "specific_dates", "month_parity"], "example": "none" },
+          "recurrence_payload": { "$ref": "#/components/schemas/RecurrencePayload" },
+          "recurrence_start_date": { "type": "string", "format": "date", "nullable": true, "example": "2026-03-24" }
         }
       },
       "Error": {
