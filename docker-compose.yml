@@ -18,12 +18,15 @@ services:
 
   migrate:
     build:
-      context: .
+      context: ./docker/migrator
       dockerfile: Dockerfile
-    command: ["/app/migrate", "up"]
     environment:
-      DATABASE_DSN: postgres://postgres:postgres@postgres:5432/taskservice?sslmode=disable
-      MIGRATIONS_DIR: /app/migrations
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/taskservice?sslmode=disable
+      TEST_DATABASE_URL: postgres://postgres:postgres@postgres:5432/taskservice_test?sslmode=disable
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_TEST_DB: taskservice_test
     depends_on:
       postgres:
         condition: service_healthy
