@@ -36,24 +36,17 @@ func TestValidateRecurrence_MonthlyDay(t *testing.T) {
 func TestValidateRecurrence_SpecificDates(t *testing.T) {
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	start := common.NewDate(base)
-	// empty specific dates -> error
 	if err := validateRecurrence(recurrence.SpecificDates, recurrence.RecurrencePayload{SpecificDates: nil}, &start); err == nil {
 		t.Fatalf("expected error for empty specific dates")
 	}
-
-	// date before start -> error
 	before := common.NewDate(base.Add(-24 * time.Hour))
 	if err := validateRecurrence(recurrence.SpecificDates, recurrence.RecurrencePayload{SpecificDates: []common.DateType{before}}, &start); err == nil {
 		t.Fatalf("expected error for specific date before start")
 	}
-
-	// duplicate dates -> error
 	d := common.NewDate(base.Add(48 * time.Hour))
 	if err := validateRecurrence(recurrence.SpecificDates, recurrence.RecurrencePayload{SpecificDates: []common.DateType{d, d}}, &start); err == nil {
 		t.Fatalf("expected error for duplicate specific dates")
 	}
-
-	// valid
 	valid := common.NewDate(base.Add(24 * time.Hour))
 	if err := validateRecurrence(recurrence.SpecificDates, recurrence.RecurrencePayload{SpecificDates: []common.DateType{valid}}, &start); err != nil {
 		t.Fatalf("unexpected error: %v", err)

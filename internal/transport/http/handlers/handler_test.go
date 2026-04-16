@@ -73,7 +73,6 @@ func TestCreateHandler(t *testing.T) {
 func TestGetListHandlers(t *testing.T) {
     h := NewTaskHandler(&mockUsecase{})
 
-    // GET by id - route through mux so vars are populated
     req := httptest.NewRequest(http.MethodGet, "/tasks/1", nil)
     rr := httptest.NewRecorder()
     router := mux.NewRouter()
@@ -81,7 +80,6 @@ func TestGetListHandlers(t *testing.T) {
     router.ServeHTTP(rr, req)
     if rr.Code != http.StatusOK { t.Fatalf("GetByID status %d body=%s", rr.Code, rr.Body.String()) }
 
-    // List
     req2 := httptest.NewRequest(http.MethodGet, "/tasks", nil)
     rr2 := httptest.NewRecorder()
     h.List(rr2, req2)
