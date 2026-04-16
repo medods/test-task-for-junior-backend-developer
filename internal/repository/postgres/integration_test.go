@@ -3,10 +3,12 @@ package postgres_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,15 +45,10 @@ func TestMigrations_Staircase(t *testing.T) {
 		t.Logf("migrator version err: %v", verr)
 	}
 
-	// Apply all migrations, then revert them. Using Up/Down avoids
-	// occasional file-driver Steps edge-cases on some hosts/paths.
-	if err := m.Up(); err != nil {
-		if !errors.Is(err, migrate.ErrNoChange) {
-			t.Fatalf("migrate up: %v", err)
-		}
-	}
-	if err := m.Down(); err != nil {
-		t.Fatalf("migrate down: %v", err)
+	// Run staircase: try stepping one-by-one, fallback to Up/Down if the
+	// file-source driver exhibits path-related edge-cases.
+	if err := staircase(m); err != nil {
+		t.Fatalf("staircase failed: %T: %v", err, err)
 	}
 
 	conn, err := pgx.Connect(ctx, dbDSN)
@@ -150,6 +147,7 @@ func TestRepository_ListByDate(t *testing.T) {
 }
 
 func staircase(m *migrate.Migrate) error {
+	// Try stepping up one migration at a time.
 	for {
 		err := m.Steps(1)
 		if err == nil {
@@ -158,9 +156,23 @@ func staircase(m *migrate.Migrate) error {
 		if errors.Is(err, migrate.ErrNoChange) {
 			break
 		}
+		// If the file driver reports path issues, fall back to Up/Down.
+		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "file does not exist") {
+			// fallback: apply all then revert
+			if upErr := m.Up(); upErr != nil {
+				if !errors.Is(upErr, migrate.ErrNoChange) {
+					return fmt.Errorf("staircase fallback up failed: %w (orig: %v)", upErr, err)
+				}
+			}
+			if downErr := m.Down(); downErr != nil {
+				return fmt.Errorf("staircase fallback down failed: %w (orig: %v)", downErr, err)
+			}
+			return nil
+		}
 		return err
 	}
 
+	// Then step down one migration at a time.
 	for {
 		err := m.Steps(-1)
 		if err == nil {
@@ -168,6 +180,12 @@ func staircase(m *migrate.Migrate) error {
 		}
 		if errors.Is(err, migrate.ErrNoChange) {
 			break
+		}
+		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "file does not exist") {
+			if downErr := m.Down(); downErr != nil {
+				return fmt.Errorf("staircase fallback down failed: %w (orig: %v)", downErr, err)
+			}
+			return nil
 		}
 		return err
 	}
