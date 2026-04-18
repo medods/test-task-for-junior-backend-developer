@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -27,10 +28,60 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var scheduledFor *time.Time
+	if req.ScheduledFor != nil {
+		parsedTime, err := time.Parse("2006-01-02", *req.ScheduledFor)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, errors.New("invalid scheduled_for format, expected YYYY-MM-DD"))
+			return
+		}
+		scheduledFor = &parsedTime
+	}
+
+	var recurrence *taskusecase.RecurrenceInput
+	if req.Recurrence != nil {
+		parsedStartDate, err := time.Parse("2006-01-02", req.Recurrence.StartDate)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, errors.New("invalid start_date format, expected YYYY-MM-DD"))
+			return
+		}
+
+		var endDate *time.Time
+		if req.Recurrence.EndDate != nil {
+			parsedEndDate, err := time.Parse("2006-01-02", *req.Recurrence.EndDate)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, errors.New("invalid end_date format, expected YYYY-MM-DD"))
+				return
+			}
+			endDate = &parsedEndDate
+		}
+
+		specificDates := make([]time.Time, 0, len(req.Recurrence.SpecificDates))
+		for _, rawDate := range req.Recurrence.SpecificDates {
+			parsedDate, err := time.Parse("2006-01-02", rawDate)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, errors.New("invalid specific_dates format, expected YYYY-MM-DD"))
+				return
+			}
+			specificDates = append(specificDates, parsedDate)
+		}
+
+		recurrence = &taskusecase.RecurrenceInput{
+			Type:          taskdomain.RecurrenceType(req.Recurrence.Type),
+			StartDate:     parsedStartDate,
+			EndDate:       endDate,
+			EveryNDays:    req.Recurrence.EveryNDays,
+			DayOfMonth:    req.Recurrence.DayOfMonth,
+			SpecificDates: specificDates,
+		}
+	}
+
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:        req.Title,
+		Description:  req.Description,
+		Status:       req.Status,
+		ScheduledFor: scheduledFor,
+		Recurrence:   recurrence,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
