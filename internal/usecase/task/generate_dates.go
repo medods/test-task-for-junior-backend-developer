@@ -5,28 +5,37 @@ import (
 	"time"
 )
 
-const (
-	defaultDayStep = 1
+const defaultDayStep = 1
 
-	daily         = "daily"
-	monthly       = "monthly"
-	specificDates = "specific_dates"
-	evenOdd       = "even_odd"
+type RecurrenceType string
+
+const (
+	Daily         RecurrenceType = "daily"
+	Monthly       RecurrenceType = "monthly"
+	SpecificDates RecurrenceType = "specific_dates"
+	EvenOdd       RecurrenceType = "even_odd"
 )
 
+type ParityWeekType string
+
+const (
+	Even ParityWeekType = "even"
+	Odd  ParityWeekType = "odd"
+)
+
+var recurrenceGenerators = map[RecurrenceType]func(RecurrenceInput) ([]time.Time, error){
+	Daily:         generateDailyDates,
+	Monthly:       generateMonthlyDates,
+	SpecificDates: func(input RecurrenceInput) ([]time.Time, error) { return input.Dates, nil },
+	EvenOdd:       generateEvenOddDates,
+}
+
 func generateDates(input RecurrenceInput) ([]time.Time, error) {
-	switch input.Type {
-	case daily:
-		return generateDailyDates(input)
-	case monthly:
-		return generateMonthlyDates(input)
-	case specificDates:
-		return input.Dates, nil
-	case evenOdd:
-		return generateEvenOddDates(input)
-	default:
-		return nil, fmt.Errorf("неизвестный тип периодичности: %s", input.Type)
+	generator, ok := recurrenceGenerators[RecurrenceType(input.Type)]
+	if !ok {
+		return nil, fmt.Errorf("recurrence type not valid: %s", input.Type)
 	}
+	return generator(input)
 }
 
 func generateDailyDates(input RecurrenceInput) ([]time.Time, error) {
@@ -47,13 +56,11 @@ func generateDailyDates(input RecurrenceInput) ([]time.Time, error) {
 
 func generateMonthlyDates(input RecurrenceInput) ([]time.Time, error) {
 	day := *input.DayOfMonth
-	start := input.StartDate
-	end := input.EndDate
 
 	var dates []time.Time
+	current := firstMonthDayOnOrAfter(input.StartDate, day)
 
-	current := firstMonthDayOnOrAfter(start, day)
-	for !current.After(end) {
+	for !current.After(input.EndDate) {
 		dates = append(dates, current)
 		current = time.Date(current.Year(), current.Month()+1, 1, 0, 0, 0, 0, current.Location())
 		current = adjustDay(current, day)
@@ -64,15 +71,13 @@ func generateMonthlyDates(input RecurrenceInput) ([]time.Time, error) {
 
 func generateEvenOddDates(input RecurrenceInput) ([]time.Time, error) {
 	parity := *input.Parity
-	start := input.StartDate
-	end := input.EndDate
 
 	var dates []time.Time
-	current := start
+	current := input.StartDate
 
-	for !current.After(end) {
+	for !current.After(input.EndDate) {
 		day := current.Day()
-		if (parity == "even" && day%2 == 0) || (parity == "odd" && day%2 != 0) {
+		if (parity == string(Even) && day%2 == 0) || (parity == string(Odd) && day%2 != 0) {
 			dates = append(dates, current)
 		}
 

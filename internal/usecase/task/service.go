@@ -175,27 +175,29 @@ func validateRecurrenceInput(input RecurrenceInput) (RecurrenceInput, error) {
 		return RecurrenceInput{}, fmt.Errorf("%w: endDate is before startDate", ErrInvalidRecurrence)
 	}
 
-	if input.Type == daily && input.EveryNDays == nil {
+	inputType := RecurrenceType(input.Type)
+
+	if inputType == Daily && input.EveryNDays == nil {
 		return RecurrenceInput{}, fmt.Errorf("%w: nDays not specified", ErrInvalidRecurrence)
 	}
 
-	if input.Type == monthly && input.DayOfMonth == nil {
+	if inputType == Monthly && input.DayOfMonth == nil {
 		return RecurrenceInput{}, fmt.Errorf("%w: dayOfMonth not specified", ErrInvalidRecurrence)
 	}
 
-	if input.Type == monthly && (*input.DayOfMonth < 1 || *input.DayOfMonth > 31) {
+	if inputType == Monthly && (*input.DayOfMonth < 1 || *input.DayOfMonth > 31) {
 		return RecurrenceInput{}, fmt.Errorf("%w: invalid dayOfMonth", ErrInvalidRecurrence)
 	}
 
-	if input.Type == evenOdd && input.Parity == nil {
+	if inputType == EvenOdd && input.Parity == nil {
 		return RecurrenceInput{}, fmt.Errorf("%w: parity not specified", ErrInvalidRecurrence)
 	}
 
-	if input.Type == evenOdd && *input.Parity != "odd" && *input.Parity != "even" {
+	if inputType == EvenOdd && *input.Parity != string(Odd) && *input.Parity != string(Even) {
 		return RecurrenceInput{}, fmt.Errorf("%w: invalid parity", ErrInvalidRecurrence)
 	}
 
-	if input.Type == specificDates && len(input.Dates) == 0 {
+	if inputType == SpecificDates && len(input.Dates) == 0 {
 		return RecurrenceInput{}, fmt.Errorf("%w: dates not specified", ErrInvalidRecurrence)
 	}
 
