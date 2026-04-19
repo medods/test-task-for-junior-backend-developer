@@ -7,6 +7,7 @@ import (
 	"time"
 
 	taskdomain "example.com/taskservice/internal/domain/task"
+	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -27,14 +28,53 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		return nil, err
 	}
 
+	var dates []time.Time
+
+	if input.Recurrence != nil {
+		dates, err = generateDates(*input.Recurrence)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(dates) > 0 {
+		tasks := make([]*taskdomain.Task, 0, len(dates))
+		groupId := uuid.New().String()
+		for _, date := range dates {
+			now := s.now()
+			tasks = append(tasks, &taskdomain.Task{
+				Title:             normalized.Title,
+				Description:       normalized.Description,
+				Status:            normalized.Status,
+				CreatedAt:         now,
+				UpdatedAt:         now,
+				RecurrenceType:    &normalized.Recurrence.Type,
+				RecurrenceGroupID: &groupId,
+				ScheduledDate:     &date,
+			})
+		}
+
+		created, err := s.repo.CreateBatch(ctx, tasks)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(created) > 0 {
+			return created[0], nil
+		}
+
+		return nil, nil
+	}
+
+	now := s.now()
+
 	model := &taskdomain.Task{
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
-	now := s.now()
-	model.CreatedAt = now
-	model.UpdatedAt = now
 
 	created, err := s.repo.Create(ctx, model)
 	if err != nil {
@@ -86,8 +126,16 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context) ([]taskdomain.Task, error) {
-	return s.repo.List(ctx)
+func (s *Service) DeleteByGroupID(ctx context.Context, groupID string) error {
+	if groupID == "" {
+		return fmt.Errorf("%w: groupID must be not empty", ErrInvalidInput)
+	}
+
+	return s.repo.DeleteByGroupID(ctx, groupID)
+}
+
+func (s *Service) List(ctx context.Context, groupID string) ([]taskdomain.Task, error) {
+	return s.repo.List(ctx, groupID)
 }
 
 func validateCreateInput(input CreateInput) (CreateInput, error) {
@@ -106,6 +154,14 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
+	if input.Recurrence != nil {
+		rec, err := validateRecurrenceInput(*input.Recurrence)
+		if err != nil {
+			return CreateInput{}, fmt.Errorf("%w: %w", ErrInvalidInput, err)
+		}
+		input.Recurrence = &rec
+	}
+
 	return input, nil
 }
 
@@ -119,6 +175,38 @@ func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 
 	if !input.Status.Valid() {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
+	}
+
+	return input, nil
+}
+
+func validateRecurrenceInput(input RecurrenceInput) (RecurrenceInput, error) {
+	if input.EndDate.Before(input.StartDate) {
+		return RecurrenceInput{}, fmt.Errorf("%w: endDate is before startDate", ErrInvalidRecurrence)
+	}
+
+	if input.Type == daily && input.EveryNDays == nil {
+		return RecurrenceInput{}, fmt.Errorf("%w: nDays not specified", ErrInvalidRecurrence)
+	}
+
+	if input.Type == monthly && input.DayOfMonth == nil {
+		return RecurrenceInput{}, fmt.Errorf("%w: dayOfMonth not specified", ErrInvalidRecurrence)
+	}
+
+	if input.Type == monthly && (*input.DayOfMonth < 1 || *input.DayOfMonth > 31) {
+		return RecurrenceInput{}, fmt.Errorf("%w: invalid dayOfMonth", ErrInvalidRecurrence)
+	}
+
+	if input.Type == evenOdd && input.Parity == nil {
+		return RecurrenceInput{}, fmt.Errorf("%w: parity not specified", ErrInvalidRecurrence)
+	}
+
+	if input.Type == evenOdd && *input.Parity != "odd" && *input.Parity != "even" {
+		return RecurrenceInput{}, fmt.Errorf("%w: invalid parity", ErrInvalidRecurrence)
+	}
+
+	if input.Type == specificDates && len(input.Dates) == 0 {
+		return RecurrenceInput{}, fmt.Errorf("%w: dates not specified", ErrInvalidRecurrence)
 	}
 
 	return input, nil
