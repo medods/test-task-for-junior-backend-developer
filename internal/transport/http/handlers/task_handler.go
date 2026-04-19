@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 
 	taskdomain "example.com/taskservice/internal/domain/task"
@@ -134,8 +135,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	groupID := r.URL.Query().Get("group_id")
 
 	if groupID != "" {
-		// простейшая проверка на кол-во символов, можно сделать проверку через regex
-		if len(groupID) != uuidLen {
+		if !isValidUUID(groupID) {
 			writeError(w, http.StatusBadRequest, errors.New("invalid group_id format"))
 			return
 		}
@@ -178,6 +178,9 @@ func getGroupIDFromRequest(r *http.Request) (string, error) {
 	if groupID == "" {
 		return "", errors.New("missing group id")
 	}
+	if !isValidUUID(groupID) {
+		return "", errors.New("invalid group_id format")
+	}
 
 	return groupID, nil
 }
@@ -215,4 +218,9 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.WriteHeader(status)
 
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func isValidUUID(id string) bool {
+	_, err := uuid.Parse(id)
+	return err == nil
 }

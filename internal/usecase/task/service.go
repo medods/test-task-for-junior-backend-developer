@@ -28,60 +28,49 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		return nil, err
 	}
 
-	var dates []time.Time
-
-	if input.Recurrence != nil {
-		dates, err = generateDates(*input.Recurrence)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if len(dates) > 0 {
-		tasks := make([]*taskdomain.Task, 0, len(dates))
-		groupId := uuid.New().String()
-		for _, date := range dates {
-			now := s.now()
-			tasks = append(tasks, &taskdomain.Task{
-				Title:             normalized.Title,
-				Description:       normalized.Description,
-				Status:            normalized.Status,
-				CreatedAt:         now,
-				UpdatedAt:         now,
-				RecurrenceType:    &normalized.Recurrence.Type,
-				RecurrenceGroupID: &groupId,
-				ScheduledDate:     &date,
-			})
-		}
-
-		created, err := s.repo.CreateBatch(ctx, tasks)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(created) > 0 {
-			return created[0], nil
-		}
-
-		return nil, nil
-	}
-
 	now := s.now()
 
-	model := &taskdomain.Task{
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+	if normalized.Recurrence == nil {
+		return s.repo.Create(ctx, &taskdomain.Task{
+			Title:       normalized.Title,
+			Description: normalized.Description,
+			Status:      normalized.Status,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		})
 	}
 
-	created, err := s.repo.Create(ctx, model)
+	dates, err := generateDates(*normalized.Recurrence)
 	if err != nil {
 		return nil, err
 	}
+	if len(dates) == 0 {
+		return nil, nil
+	}
 
-	return created, nil
+	groupID := uuid.New().String()
+	tasks := make([]*taskdomain.Task, len(dates))
+	for i, date := range dates {
+		tasks[i] = &taskdomain.Task{
+			Title:             normalized.Title,
+			Description:       normalized.Description,
+			Status:            normalized.Status,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+			RecurrenceType:    &normalized.Recurrence.Type,
+			RecurrenceGroupID: &groupID,
+			ScheduledDate:     &date,
+		}
+	}
+
+	created, err := s.repo.CreateBatch(ctx, tasks)
+	if err != nil {
+		return nil, err
+	}
+	if len(created) > 0 {
+		return created[0], nil
+	}
+	return nil, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (*taskdomain.Task, error) {
@@ -103,11 +92,12 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 	}
 
 	model := &taskdomain.Task{
-		ID:          id,
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
-		UpdatedAt:   s.now(),
+		ID:            id,
+		Title:         normalized.Title,
+		Description:   normalized.Description,
+		Status:        normalized.Status,
+		ScheduledDate: normalized.ScheduledDate,
+		UpdatedAt:     s.now(),
 	}
 
 	updated, err := s.repo.Update(ctx, model)

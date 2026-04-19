@@ -175,22 +175,25 @@ func (r *Repository) DeleteByGroupID(ctx context.Context, groupID string) error 
 }
 
 func (r *Repository) List(ctx context.Context, groupID string) ([]taskdomain.Task, error) {
+	var (
+		rows pgx.Rows
+		err  error
+		args []any
+	)
+
 	query := `
-		SELECT id, title, description, status, scheduled_date, recurrence_type, recurrence_group_id, created_at, updated_at
-		FROM tasks
-		ORDER BY id DESC
-	`
+        SELECT id, title, description, status, scheduled_date, recurrence_type, recurrence_group_id, created_at, updated_at
+        FROM tasks
+    `
 
 	if groupID != "" {
-		query = `
-			SELECT id, title, description, status, scheduled_date, recurrence_type, recurrence_group_id, created_at, updated_at
-			FROM tasks
-			WHERE recurrence_group_id = $1
-			ORDER BY id DESC
-		`
+		query += " WHERE recurrence_group_id = $1"
+		args = append(args, groupID)
 	}
 
-	rows, err := r.pool.Query(ctx, query)
+	query += " ORDER BY id DESC"
+
+	rows, err = r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -198,16 +201,16 @@ func (r *Repository) List(ctx context.Context, groupID string) ([]taskdomain.Tas
 
 	tasks := make([]taskdomain.Task, 0)
 	for rows.Next() {
-		task, err := scanTask(rows)
-		if err != nil {
-			return nil, err
+		task, cErr := scanTask(rows)
+		if cErr != nil {
+			return nil, cErr
 		}
 
 		tasks = append(tasks, *task)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	if cErr := rows.Err(); cErr != nil {
+		return nil, cErr
 	}
 
 	return tasks, nil
