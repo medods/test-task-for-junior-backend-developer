@@ -21,6 +21,19 @@
       "get": {
         "tags": ["Tasks"],
         "summary": "List tasks",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter tasks by recurrence group ID (UUID)",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "550e8400-e29b-41d4-a716-446655440000"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Task list",
@@ -32,6 +45,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           }
         }
       },
@@ -131,6 +147,30 @@
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
+    },
+    "/api/v1/tasks/groups/{group_id}": {
+      "delete": {
+        "tags": ["Tasks"],
+        "summary": "Delete all tasks by recurrence group ID",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "description": "UUID of the recurrence group",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "204": { "description": "All tasks in group deleted" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
     }
   },
   "components": {
@@ -169,6 +209,10 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/Recurrence",
+            "description": "Optional recurrence configuration for repeating tasks"
           }
         }
       },
@@ -188,6 +232,12 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          },
+          "scheduled_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the task is scheduled (overrides recurrence for this instance)",
+            "example": "2026-04-20T09:00:00Z"
           }
         }
       },
@@ -205,6 +255,25 @@
             "enum": ["new", "in_progress", "done"],
             "example": "new"
           },
+          "scheduled_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Exact scheduled date for this task instance",
+            "example": "2026-04-20T09:00:00Z"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "nullable": true,
+            "description": "Type of recurrence if this task is part of a series",
+            "example": "daily"
+          },
+          "recurrence_group_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "UUID grouping all instances of the same recurring series",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -214,6 +283,57 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-03-24T00:00:00Z"
+          }
+        }
+      },
+      "Recurrence": {
+        "type": "object",
+        "required": ["type", "start_date", "end_date"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["daily", "even_odd", "monthly", "specific_dates"],
+            "description": "Recurrence pattern type",
+            "example": "daily"
+          },
+          "every_n_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "For daily recurrence: repeat every N days",
+            "example": 2
+          },
+          "day_of_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "description": "For monthly recurrence: day of month",
+            "example": 15
+          },
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "For specific recurrence: list of exact dates"
+          },
+          "parity": {
+            "type": "string",
+            "enum": ["even", "odd"],
+            "description": "For weekly recurrence: parity of week (even/odd)",
+            "example": "odd"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of recurrence range",
+            "example": "2026-04-01T00:00:00Z"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End of recurrence range",
+            "example": "2026-05-01T00:00:00Z"
           }
         }
       },

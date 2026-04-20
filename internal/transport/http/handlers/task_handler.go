@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 
 	taskdomain "example.com/taskservice/internal/domain/task"
@@ -21,16 +22,31 @@ func NewTaskHandler(usecase taskusecase.Usecase) *TaskHandler {
 }
 
 func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req taskMutationDTO
+	var req taskCreateDTO
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
+	}
+
+	var recurrenceInput *taskusecase.RecurrenceInput
+
+	if req.Recurrence != nil {
+		recurrenceInput = &taskusecase.RecurrenceInput{
+			Type:       req.Recurrence.Type,
+			Dates:      req.Recurrence.Dates,
+			EveryNDays: req.Recurrence.EveryNDays,
+			Parity:     req.Recurrence.Parity,
+			StartDate:  req.Recurrence.StartDate,
+			EndDate:    req.Recurrence.EndDate,
+			DayOfMonth: req.Recurrence.DayOfMonth,
+		}
 	}
 
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Recurrence:  recurrenceInput,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -63,16 +79,17 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req taskMutationDTO
+	var req taskUpdateDTO
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:         req.Title,
+		Description:   req.Description,
+		Status:        req.Status,
+		ScheduledDate: req.ScheduledDate,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -97,8 +114,32 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *TaskHandler) DeleteByGroupID(w http.ResponseWriter, r *http.Request) {
+	groupID, err := getGroupIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.usecase.DeleteByGroupID(r.Context(), groupID); err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.usecase.List(r.Context())
+	groupID := r.URL.Query().Get("group_id")
+
+	if groupID != "" {
+		if !isValidUUID(groupID) {
+			writeError(w, http.StatusBadRequest, errors.New("invalid group_id format"))
+			return
+		}
+	}
+
+	tasks, err := h.usecase.List(r.Context(), groupID)
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
@@ -128,6 +169,18 @@ func getIDFromRequest(r *http.Request) (int64, error) {
 	}
 
 	return id, nil
+}
+
+func getGroupIDFromRequest(r *http.Request) (string, error) {
+	groupID := mux.Vars(r)["group_id"]
+	if groupID == "" {
+		return "", errors.New("missing group id")
+	}
+	if !isValidUUID(groupID) {
+		return "", errors.New("invalid group_id format")
+	}
+
+	return groupID, nil
 }
 
 func decodeJSON(r *http.Request, dst any) error {
@@ -163,4 +216,9 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.WriteHeader(status)
 
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func isValidUUID(id string) bool {
+	_, err := uuid.Parse(id)
+	return err == nil
 }
