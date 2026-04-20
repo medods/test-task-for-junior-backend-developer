@@ -2,54 +2,16 @@
 
 Сервис для управления задачами с HTTP API на Go.
 
-## Требования
+## Основное
+В рамках задачи была добавлена возможность создавать расписания задач с различными типами переодичности.
 
-- Go `1.23+`
-- Docker и Docker Compose
+В апи создания был добавлен новый объект recurrence
+- `type` - тип повторения: `none`, `daily`, `monthly`, `specific_dates`, `even_odd`
+- `interval` - для `type` == `daily`, повторять каждые N дней
+- `day` - для `type` == `monthly`, число от 1 до 30
+- `even` - для `type` == `even_odd`, true или false
+- `dates` - для `type` == `specific_dates`, список конкретных дат ["2026-04-20T00:00:00Z", "2026-04-21T00:00:00Z"]
+- `start` - когда начинает работать повторение(2026-04-20T00:00:00Z)
+- `end` - когда повторение перестаёт работать(2026-04-21T00:00:00Z)
 
-## Быстрый запуск через Docker Compose
-
-```bash
-docker compose up --build
-```
-
-После запуска сервис будет доступен по адресу `http://localhost:8080`.
-
-Если `postgres` уже запускался ранее со старой схемой, пересоздай volume:
-
-```bash
-docker compose down -v
-docker compose up --build
-```
-
-Причина в том, что SQL-файл из `migrations/0001_create_tasks.up.sql` монтируется в `docker-entrypoint-initdb.d` и применяется только при инициализации пустого data volume.
-
-## Swagger
-
-Swagger UI:
-
-```text
-http://localhost:8080/swagger/
-```
-
-OpenAPI JSON:
-
-```text
-http://localhost:8080/swagger/openapi.json
-```
-
-## API
-
-Базовый префикс API:
-
-```text
-/api/v1
-```
-
-Основные маршруты:
-
-- `POST /api/v1/tasks`
-- `GET /api/v1/tasks`
-- `GET /api/v1/tasks/{id}`
-- `PUT /api/v1/tasks/{id}`
-- `DELETE /api/v1/tasks/{id}`
+При получении задач запрос отдаёт всё что подходит по критериям если `type` != `none`
