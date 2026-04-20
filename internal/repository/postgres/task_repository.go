@@ -75,7 +75,7 @@ func (r *Repository) Update(ctx context.Context, task *taskdomain.Task) (*taskdo
 		SET title = $1,
 			description = $2,
 			status = $3,
-			updated_at = $4
+			updated_at = $4,
 			scheduled_at = $5,
 			recurrence = $6,
 			is_recurring_template = $7,

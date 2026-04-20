@@ -35,7 +35,6 @@ type CreateInput struct {
 	Recurrence  *taskdomain.RecurrenceConfig
 }
 
-// TODO изменить логику изменения задачи, чтоб не передавать все параметры, а только то что нужно поменять
 type UpdateInput struct {
 	Title       string
 	Description string
