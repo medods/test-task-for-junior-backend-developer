@@ -163,14 +163,14 @@
             "description": "Тип повторения задачи",
             "example": "daily"
           },
-          "interval_days": {
+          "Daily": {
             "type": "integer",
             "minimum": 1,
             "maximum": 30,
             "description": "Для daily: каждый N-й день",
             "example": 1
           },
-          "month_day": {
+          "Monthly": {
             "type": "integer",
             "minimum": 1,
             "maximum": 30,
@@ -187,7 +187,7 @@
             "description": "Для specific_dates: список конкретных дат",
             "example": ["2026-05-01", "2026-05-15", "2026-06-01"]
           },
-          "parity_type": {
+          "parity_dates": {
             "type": "string",
             "enum": ["even", "odd"],
             "description": "Для parity: четные или нечетные дни",
