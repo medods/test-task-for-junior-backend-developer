@@ -20,17 +20,22 @@ func GenerateRecurringDates(config *RecurrenceConfig, startDate time.Time, now t
 	var err error
 
 	switch config.Type {
-	case "daily":
+	case RecurrenceTypeDaily:
 		dates = generateDailyDates(config.Daily, startDate, repeatCount)
-	case "monthly":
+	case RecurrenceTypeMonthly:
 		dates = generateMonthlyDates(config.Monthly, startDate, repeatCount)
-	case "specific_dates":
+	case RecurrenceTypeSpecificDates:
 		dates, err = generateSpecificDates(config.SpecificDates, startDate)
 		if err != nil {
 			return nil, err
 		}
-		repeatCount = min(repeatCount, len(dates))
-	case "parity":
+		if config.RepeatCount == 0 {
+			repeatCount = len(dates)
+		} else {
+			repeatCount = min(config.RepeatCount, len(dates))
+		}
+
+	case RecurrenceTypeParityDates:
 		dates = generateParityDates(config.ParityDates, startDate, repeatCount)
 	default:
 		return nil, nil
@@ -115,7 +120,7 @@ func generateSpecificDates(specificDates []string, startDate time.Time) ([]time.
 	return dates, nil
 }
 
-func generateParityDates(parityType string, startDate time.Time, count int) []time.Time {
+func generateParityDates(parityType ParityDateType, startDate time.Time, count int) []time.Time {
 	if count <= 0 {
 		return []time.Time{}
 	}
