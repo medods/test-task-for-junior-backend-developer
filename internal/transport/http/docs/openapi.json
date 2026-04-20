@@ -153,9 +153,57 @@
       }
     },
     "schemas": {
+      "RecurrenceConfig": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["daily", "monthly", "specific_dates", "parity"],
+            "description": "Тип повторения задачи",
+            "example": "daily"
+          },
+          "Daily": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "Для daily: каждый N-й день",
+            "example": 1
+          },
+          "Monthly": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "Для monthly: число месяца (1-30)",
+            "example": 15
+          },
+          "specific_dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-05-01"
+            },
+            "description": "Для specific_dates: список конкретных дат",
+            "example": ["2026-05-01", "2026-05-15", "2026-06-01"]
+          },
+          "parity_dates": {
+            "type": "string",
+            "enum": ["even", "odd"],
+            "description": "Для parity: четные или нечетные дни",
+            "example": "even"
+          },
+          "repeat_count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Количество создаваемых экземпляров задачи",
+            "example": 90
+          }
+        }
+      },
       "CreateTaskRequest": {
         "type": "object",
-        "required": ["title"],
+        "required": ["title", "scheduled_at"],
         "properties": {
           "title": {
             "type": "string",
@@ -169,12 +217,21 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Дата и время выполнения задачи",
+            "example": "2026-04-25T10:00:00Z"
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/RecurrenceConfig"
           }
         }
       },
       "UpdateTaskRequest": {
         "type": "object",
-        "required": ["title", "status"],
+        "required": ["title", "status", "scheduled_at"],
         "properties": {
           "title": {
             "type": "string",
@@ -188,6 +245,15 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Дата и время выполнения задачи",
+            "example": "2026-04-25T10:00:00Z"
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/RecurrenceConfig"
           }
         }
       },
@@ -214,6 +280,27 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-03-24T00:00:00Z"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Дата и время выполнения задачи",
+            "example": "2026-04-25T10:00:00Z"
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/RecurrenceConfig"
+          },
+          "is_recurring_template": {
+            "type": "boolean",
+            "description": "Является ли задача шаблоном для повторяющихся задач",
+            "example": false
+          },
+          "parent_template_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "ID шаблона, если задача является экземпляром повторяющейся серии",
+            "example": null,
+            "nullable": true
           }
         }
       },

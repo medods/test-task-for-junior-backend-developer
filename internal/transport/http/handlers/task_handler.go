@@ -26,11 +26,24 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if req.Recurrence != nil {
+		if err := req.Recurrence.Validate(); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	if req.ScheduledAt.IsZero() {
+		writeError(w, http.StatusBadRequest, errors.New("scheduled_at is required"))
+		return
+	}
 
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		ScheduledAt: req.ScheduledAt,
+		Recurrence:  req.Recurrence,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -69,10 +82,19 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Recurrence != nil {
+		if err := req.Recurrence.Validate(); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		ScheduledAt: req.ScheduledAt,
+		Recurrence:  req.Recurrence,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
