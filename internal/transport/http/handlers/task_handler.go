@@ -17,8 +17,6 @@ type TaskHandler struct {
 	usecase taskusecase.Usecase
 }
 
-const uuidLen = 36
-
 func NewTaskHandler(usecase taskusecase.Usecase) *TaskHandler {
 	return &TaskHandler{usecase: usecase}
 }

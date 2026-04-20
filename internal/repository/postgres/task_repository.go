@@ -46,7 +46,7 @@ func (r *Repository) Create(ctx context.Context, task *taskdomain.Task) (*taskdo
 
 func (r *Repository) CreateBatch(ctx context.Context, tasks []*taskdomain.Task) ([]*taskdomain.Task, error) {
 	if len(tasks) == 0 {
-		return nil, nil // можно возвращать ошибку если по условиям линтера nil nil нельзя возвращать
+		return nil, nil // можно возвращать ошибку если по условиям линтера nil nil нельзя будет возвращать
 	}
 
 	tx, err := r.pool.Begin(ctx)
