@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -136,6 +137,10 @@ func decodeJSON(r *http.Request, dst any) error {
 
 	if err := decoder.Decode(dst); err != nil {
 		return err
+	}
+
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return errors.New("request body must contain a single JSON object")
 	}
 
 	return nil

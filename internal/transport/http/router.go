@@ -9,7 +9,7 @@ import (
 	httphandlers "example.com/taskservice/internal/transport/http/handlers"
 )
 
-func NewRouter(taskHandler *httphandlers.TaskHandler, docsHandler *swaggerdocs.Handler) *mux.Router {
+func NewRouter(taskHandler *httphandlers.TaskHandler, recurrenceHandler *httphandlers.RecurrenceHandler, docsHandler *swaggerdocs.Handler) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 
 	router.HandleFunc("/swagger/openapi.json", docsHandler.ServeSpec).Methods(http.MethodGet)
@@ -23,6 +23,12 @@ func NewRouter(taskHandler *httphandlers.TaskHandler, docsHandler *swaggerdocs.H
 	api.HandleFunc("/tasks/{id:[0-9]+}", taskHandler.GetByID).Methods(http.MethodGet)
 	api.HandleFunc("/tasks/{id:[0-9]+}", taskHandler.Update).Methods(http.MethodPut)
 	api.HandleFunc("/tasks/{id:[0-9]+}", taskHandler.Delete).Methods(http.MethodDelete)
+
+	api.HandleFunc("/recurrence-rules", recurrenceHandler.Create).Methods(http.MethodPost)
+	api.HandleFunc("/recurrence-rules", recurrenceHandler.List).Methods(http.MethodGet)
+	api.HandleFunc("/recurrence-rules/{id:[0-9]+}", recurrenceHandler.GetByID).Methods(http.MethodGet)
+	api.HandleFunc("/recurrence-rules/{id:[0-9]+}", recurrenceHandler.Update).Methods(http.MethodPut)
+	api.HandleFunc("/recurrence-rules/{id:[0-9]+}", recurrenceHandler.Delete).Methods(http.MethodDelete)
 
 	return router
 }

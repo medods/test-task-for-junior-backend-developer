@@ -15,7 +15,8 @@ import (
 	transporthttp "example.com/taskservice/internal/transport/http"
 	swaggerdocs "example.com/taskservice/internal/transport/http/docs"
 	httphandlers "example.com/taskservice/internal/transport/http/handlers"
-	"example.com/taskservice/internal/usecase/task"
+	recurrenceusecase "example.com/taskservice/internal/usecase/recurrence"
+	taskusecase "example.com/taskservice/internal/usecase/task"
 )
 
 func main() {
@@ -36,10 +37,21 @@ func main() {
 	defer pool.Close()
 
 	taskRepo := postgresrepo.New(pool)
-	taskUsecase := task.NewService(taskRepo)
-	taskHandler := httphandlers.NewTaskHandler(taskUsecase)
+	recurrenceRepo := postgresrepo.NewRecurrenceRepository(pool)
+	taskService := taskusecase.NewService(taskRepo)
+	recurrenceService := recurrenceusecase.NewService(recurrenceRepo)
+
+	if err := recurrenceService.MaterializeActive(ctx); err != nil {
+		logger.Error("initial materialization failed", "error", err)
+		os.Exit(1)
+	}
+
+	go runMaterializer(ctx, logger, recurrenceService, cfg.MaterializationInterval)
+
+	taskHandler := httphandlers.NewTaskHandler(taskService)
+	recurrenceHandler := httphandlers.NewRecurrenceHandler(recurrenceService)
 	docsHandler := swaggerdocs.NewHandler()
-	router := transporthttp.NewRouter(taskHandler, docsHandler)
+	router := transporthttp.NewRouter(taskHandler, recurrenceHandler, docsHandler)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -66,9 +78,30 @@ func main() {
 	}
 }
 
+type materializer interface {
+	MaterializeActive(ctx context.Context) error
+}
+
+func runMaterializer(ctx context.Context, logger *slog.Logger, service materializer, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := service.MaterializeActive(ctx); err != nil {
+				logger.Error("periodic materialization failed", "error", err)
+			}
+		}
+	}
+}
+
 type config struct {
-	HTTPAddr    string
-	DatabaseDSN string
+	HTTPAddr                string
+	DatabaseDSN             string
+	MaterializationInterval time.Duration
 }
 
 func loadConfig() config {
@@ -80,6 +113,12 @@ func loadConfig() config {
 	if cfg.DatabaseDSN == "" {
 		panic(fmt.Errorf("DATABASE_DSN is required"))
 	}
+
+	interval, err := time.ParseDuration(envOrDefault("MATERIALIZATION_INTERVAL", "1m"))
+	if err != nil {
+		panic(fmt.Errorf("invalid MATERIALIZATION_INTERVAL: %w", err))
+	}
+	cfg.MaterializationInterval = interval
 
 	return cfg
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	taskdomain "example.com/taskservice/internal/domain/task"
+	"example.com/taskservice/internal/shared/dateutil"
 )
 
 type Service struct {
@@ -27,14 +28,16 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		return nil, err
 	}
 
-	model := &taskdomain.Task{
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
-	}
 	now := s.now()
-	model.CreatedAt = now
-	model.UpdatedAt = now
+	model := &taskdomain.Task{
+		Title:        normalized.Title,
+		Description:  normalized.Description,
+		Status:       normalized.Status,
+		ScheduledFor: dateutil.Today(s.now),
+		IsModified:   true,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
 
 	created, err := s.repo.Create(ctx, model)
 	if err != nil {
@@ -67,6 +70,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		IsModified:  true,
 		UpdatedAt:   s.now(),
 	}
 

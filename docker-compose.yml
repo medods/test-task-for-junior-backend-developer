@@ -14,7 +14,7 @@ services:
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./migrations/0001_create_tasks.up.sql:/docker-entrypoint-initdb.d/001_create_tasks.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d:ro
 
   app:
     build:
@@ -23,6 +23,7 @@ services:
     environment:
       HTTP_ADDR: :8080
       DATABASE_DSN: postgres://postgres:postgres@postgres:5432/taskservice?sslmode=disable
+      MATERIALIZATION_INTERVAL: 1m
     ports:
       - "8080:8080"
     depends_on:
