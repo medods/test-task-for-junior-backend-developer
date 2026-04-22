@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"example.com/taskservice/internal/scheduler"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,12 +19,28 @@ import (
 	"example.com/taskservice/internal/usecase/task"
 )
 
+const (
+	InternalErrorCode      = 1
+	ShotDownContextTimeOut = 10 * time.Second
+	ReadHeaderTimeout      = 5 * time.Second
+	SchedulerInterval      = 1 * time.Minute
+)
+
+// @title Task Service API
+// @version 1.0
+// @description API для управления задачами и шаблонами.
+// @host localhost:8080
+// @BasePath /
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 
-	cfg := loadConfig()
+	cfg, err := loadConfig()
+	if err != nil {
+		logger.Error("Error loading config", "error", err)
+		os.Exit(InternalErrorCode)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -31,12 +48,17 @@ func main() {
 	pool, err := infrastructurepostgres.Open(ctx, cfg.DatabaseDSN)
 	if err != nil {
 		logger.Error("open postgres", "error", err)
-		os.Exit(1)
+		os.Exit(InternalErrorCode)
 	}
 	defer pool.Close()
 
 	taskRepo := postgresrepo.New(pool)
-	taskUsecase := task.NewService(taskRepo)
+	taskUsecase := task.NewService(taskRepo, logger)
+
+	taskScheduler := scheduler.NewScheduler(taskUsecase, logger, SchedulerInterval)
+
+	go taskScheduler.Run(ctx)
+
 	taskHandler := httphandlers.NewTaskHandler(taskUsecase)
 	docsHandler := swaggerdocs.NewHandler()
 	router := transporthttp.NewRouter(taskHandler, docsHandler)
@@ -44,25 +66,25 @@ func main() {
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: ReadHeaderTimeout,
 	}
 
 	go func() {
 		<-ctx.Done()
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), ShotDownContextTimeOut)
 		defer cancel()
 
-		if err := server.Shutdown(shutdownCtx); err != nil {
+		if err = server.Shutdown(shutdownCtx); err != nil {
 			logger.Error("shutdown http server", "error", err)
 		}
 	}()
 
 	logger.Info("http server started", "addr", cfg.HTTPAddr)
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err = server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error("listen and serve", "error", err)
-		os.Exit(1)
+		os.Exit(InternalErrorCode)
 	}
 }
 
@@ -71,17 +93,17 @@ type config struct {
 	DatabaseDSN string
 }
 
-func loadConfig() config {
-	cfg := config{
+func loadConfig() (*config, error) {
+	cfg := &config{
 		HTTPAddr:    envOrDefault("HTTP_ADDR", ":8080"),
 		DatabaseDSN: envOrDefault("DATABASE_DSN", "postgres://postgres:postgres@localhost:5432/taskservice?sslmode=disable"),
 	}
 
 	if cfg.DatabaseDSN == "" {
-		panic(fmt.Errorf("DATABASE_DSN is required"))
+		return nil, errors.New("DATABASE_DSN is required")
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 func envOrDefault(key, fallback string) string {

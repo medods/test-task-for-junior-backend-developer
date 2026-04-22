@@ -13,7 +13,7 @@
   "tags": [
     {
       "name": "Tasks",
-      "description": "Operations with tasks"
+      "description": "Operations with tasks and templates"
     }
   ],
   "paths": {
@@ -131,6 +131,66 @@
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
+    },
+    "/api/v1/templates/{id}/enable": {
+      "post": {
+        "tags": ["Tasks"],
+        "summary": "Activate template",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "enabled" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/templates/{id}/disable": {
+      "post": {
+        "tags": ["Tasks"],
+        "summary": "Deactivate template",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "disabled" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
     }
   },
   "components": {
@@ -153,68 +213,65 @@
       }
     },
     "schemas": {
+      "RecurrenceConfig": {
+        "type": "object",
+        "properties": {
+          "interval": { "type": "integer", "example": 1 },
+          "day": { "type": "integer", "example": 1 },
+          "parity": { "type": "string", "enum": ["even", "odd"], "example": "even" },
+          "dates": {
+            "type": "array",
+            "items": { "type": "string", "format": "date-time" }
+          }
+        }
+      },
+      "RecurrenceRequest": {
+        "type": "object",
+        "required": ["type", "config"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["daily", "monthly", "parity", "dates"]
+          },
+          "config": { "$ref": "#/components/schemas/RecurrenceConfig" }
+        }
+      },
       "CreateTaskRequest": {
         "type": "object",
-        "required": ["title"],
+        "required": ["title", "task_date"],
         "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
-          }
+          "title": { "type": "string", "example": "Обход пациентов" },
+          "description": { "type": "string", "example": "Проверить 4-е отделение" },
+          "status": { "$ref": "#/components/schemas/Status" },
+          "task_date": { "type": "string", "format": "date-time", "example": "2026-04-22T09:30:00Z" },
+          "recurrence": { "$ref": "#/components/schemas/RecurrenceRequest" }
         }
       },
       "UpdateTaskRequest": {
         "type": "object",
         "required": ["title", "status"],
         "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "in_progress"
-          }
+          "title": { "type": "string", "example": "Prepare release" },
+          "description": { "type": "string", "example": "Collect release notes" },
+          "status": { "$ref": "#/components/schemas/Status" }
         }
+      },
+      "Status": {
+        "type": "string",
+        "enum": ["new", "in_progress", "done"],
+        "example": "new"
       },
       "Task": {
         "type": "object",
         "properties": {
           "id": { "type": "integer", "format": "int64", "example": 1 },
-          "title": { "type": "string", "example": "Prepare release" },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          }
+          "template_id": { "type": "integer", "format": "int64", "nullable": true, "example": 10 },
+          "title": { "type": "string", "example": "Обход пациентов" },
+          "description": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/Status" },
+          "task_date": { "type": "string", "format": "date-time", "example": "2026-04-22T09:30:00Z" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
         }
       },
       "Error": {

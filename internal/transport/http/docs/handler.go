@@ -21,7 +21,7 @@ func NewHandler() *Handler {
 	return &Handler{spec: spec}
 }
 
-func (h *Handler) ServeSpec(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ServeSpec(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
@@ -29,11 +29,11 @@ func (h *Handler) ServeSpec(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(h.spec)
 }
 
-func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ServeUI(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 
-	_, _ = w.Write([]byte(swaggerUIHTML))
+	_, _ = w.Write(swaggerUIHTML)
 }
 
 func (h *Handler) RedirectToUI(w http.ResponseWriter, r *http.Request) {

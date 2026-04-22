@@ -3,8 +3,14 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+const (
+	TickerRetryConnect = 2 * time.Second
+	AttemptRetryCount  = 5
 )
 
 func Open(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
@@ -14,18 +20,31 @@ func Open(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse dsn: %w", err)
 	}
 
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return nil, err
+	var pool *pgxpool.Pool
+	for i := 0; i < AttemptRetryCount; i++ {
+		pool, err = pgxpool.NewWithConfig(ctx, cfg)
+		if err == nil {
+			err = pool.Ping(ctx)
+		}
+
+		if err == nil {
+			return pool, nil
+		}
+
+		if pool != nil {
+			pool.Close()
+		}
+
+		select {
+		case <-time.After(TickerRetryConnect):
+			continue
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, err
-	}
-
-	return pool, nil
+	return nil, fmt.Errorf("failed to connect to postgres after retries: %w", err)
 }
