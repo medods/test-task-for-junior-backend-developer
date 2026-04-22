@@ -3,8 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -26,12 +28,35 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	var recurrence *taskdomain.Recurrence
+	if req.RecurrenceDTO != nil {
+		recurrence = &taskdomain.Recurrence{
+			Type:       taskdomain.RecurrenceType(req.RecurrenceDTO.Type),
+			Interval:   req.RecurrenceDTO.Interval,
+			DayOfMonth: req.RecurrenceDTO.DayOfMonth,
+			IsEven:     req.RecurrenceDTO.IsEven,
+		}
+		if len(req.RecurrenceDTO.SpecificDates) > 0 {
+			recurrence.SpecificDates = make([]time.Time, len(req.RecurrenceDTO.SpecificDates))
+			for i, dateStr := range req.RecurrenceDTO.SpecificDates {
+				parsed, err := time.Parse("2006-01-02", dateStr)
+				if err != nil {
+					writeError(w, http.StatusBadRequest, fmt.Errorf("Неправильный формат даты: %s", dateStr))
+					return
+				}
+				recurrence.SpecificDates[i] = parsed
+			}
+		}
+
+	}
 
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Recurrence:  recurrence,
 	})
+
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
@@ -69,10 +94,33 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var recurrence *taskdomain.Recurrence
+	if req.RecurrenceDTO != nil {
+		recurrence = &taskdomain.Recurrence{
+			Type:       taskdomain.RecurrenceType(req.RecurrenceDTO.Type),
+			Interval:   req.RecurrenceDTO.Interval,
+			DayOfMonth: req.RecurrenceDTO.DayOfMonth,
+			IsEven:     req.RecurrenceDTO.IsEven,
+		}
+		if len(req.RecurrenceDTO.SpecificDates) > 0 {
+			recurrence.SpecificDates = make([]time.Time, len(req.RecurrenceDTO.SpecificDates))
+			for i, dateStr := range req.RecurrenceDTO.SpecificDates {
+				parsed, err := time.Parse("2006-01-02", dateStr)
+				if err != nil {
+					writeError(w, http.StatusBadRequest, fmt.Errorf("Неправильный формат даты: %s", dateStr))
+					return
+				}
+				recurrence.SpecificDates[i] = parsed
+			}
+		}
+
+	}
+
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Recurrence:  recurrence,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
