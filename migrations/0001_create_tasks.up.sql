@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS tasks (
 	recurrence_type TEXT,
 	recurrence_interval INT,
 	recurrence_day_of_month INT,
-	recurrence_specific_dates JSONB, 
-	recurrence_is_even BOOLEAN, 
+	recurrence_specific_dates JSONB,
+	recurrence_is_even BOOLEAN
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
