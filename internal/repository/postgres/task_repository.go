@@ -3,11 +3,13 @@ package postgres
 import (
 	"context"
 	"errors"
+	taskdomain "example.com/taskservice/internal/domain"
+	"example.com/taskservice/internal/transport/http/handlers"
+	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	taskdomain "example.com/taskservice/internal/domain/task"
 )
 
 type Repository struct {
@@ -20,15 +22,26 @@ func New(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) Create(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error) {
 	const query = `
-		INSERT INTO tasks (title, description, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, title, description, status, created_at, updated_at
+		INSERT INTO tasks (title, description, status, template_id, task_date, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (title, task_date) DO NOTHING
+		RETURNING id, title, description, status, template_id, task_date, created_at, updated_at
 	`
 
-	row := r.pool.QueryRow(ctx, query, task.Title, task.Description, task.Status, task.CreatedAt, task.UpdatedAt)
+	var templateID *int64
+	if task.TemplateID != 0 {
+		templateID = &task.TemplateID
+	}
+
+	row := r.pool.QueryRow(ctx, query, task.Title, task.Description, task.Status, templateID, task.TaskDate, task.CreatedAt, task.UpdatedAt)
+
 	created, err := scanTask(row)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("task already exists for this date and template")
+		}
+
+		return nil, fmt.Errorf("failed to scan task: %w", err)
 	}
 
 	return created, nil
@@ -36,7 +49,7 @@ func (r *Repository) Create(ctx context.Context, task *taskdomain.Task) (*taskdo
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (*taskdomain.Task, error) {
 	const query = `
-		SELECT id, title, description, status, created_at, updated_at
+		SELECT id, title, description, status, template_id, task_date, created_at, updated_at
 		FROM tasks
 		WHERE id = $1
 	`
@@ -45,10 +58,10 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*taskdomain.Task, e
 	found, err := scanTask(row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, taskdomain.ErrNotFound
+			return nil, handlers.ErrNotFound
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("failed to scan task: %w", err)
 	}
 
 	return found, nil
@@ -60,19 +73,20 @@ func (r *Repository) Update(ctx context.Context, task *taskdomain.Task) (*taskdo
 		SET title = $1,
 			description = $2,
 			status = $3,
-			updated_at = $4
-		WHERE id = $5
-		RETURNING id, title, description, status, created_at, updated_at
+			task_date = $4,
+			updated_at = $5
+		WHERE id = $6
+		RETURNING id, title, description, status, template_id, task_date, created_at, updated_at
 	`
 
 	row := r.pool.QueryRow(ctx, query, task.Title, task.Description, task.Status, task.UpdatedAt, task.ID)
 	updated, err := scanTask(row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, taskdomain.ErrNotFound
+			return nil, handlers.ErrNotFound
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("failed to scan task: %w", err)
 	}
 
 	return updated, nil
@@ -83,41 +97,44 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 
 	result, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete task: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
-		return taskdomain.ErrNotFound
+		return handlers.ErrNotFound
 	}
 
 	return nil
 }
 
-func (r *Repository) List(ctx context.Context) ([]taskdomain.Task, error) {
+func (r *Repository) List(ctx context.Context) ([]*taskdomain.Task, error) {
 	const query = `
-		SELECT id, title, description, status, created_at, updated_at
+		SELECT id, title, description, status, template_id, task_date, created_at, updated_at
 		FROM tasks
-		ORDER BY id DESC
+		ORDER BY task_date DESC, id DESC
 	`
 
 	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get list tasks: %w", err)
 	}
 	defer rows.Close()
 
-	tasks := make([]taskdomain.Task, 0)
+	tasks := make([]*taskdomain.Task, 0)
+
+	var task *taskdomain.Task
+
 	for rows.Next() {
-		task, err := scanTask(rows)
+		task, err = scanTask(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to scan task: %w", err)
 		}
 
-		tasks = append(tasks, *task)
+		tasks = append(tasks, task)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to get list tasks: %w", err)
 	}
 
 	return tasks, nil
@@ -129,8 +146,10 @@ type taskScanner interface {
 
 func scanTask(scanner taskScanner) (*taskdomain.Task, error) {
 	var (
-		task   taskdomain.Task
-		status string
+		task       taskdomain.Task
+		status     string
+		templateID *int64
+		taskDate   *time.Time
 	)
 
 	if err := scanner.Scan(
@@ -138,13 +157,23 @@ func scanTask(scanner taskScanner) (*taskdomain.Task, error) {
 		&task.Title,
 		&task.Description,
 		&status,
+		&templateID,
+		&taskDate,
 		&task.CreatedAt,
 		&task.UpdatedAt,
 	); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to scan task: %w", err)
 	}
 
 	task.Status = taskdomain.Status(status)
+
+	if templateID != nil {
+		task.TemplateID = *templateID
+	}
+
+	if taskDate != nil {
+		task.TaskDate = *taskDate
+	}
 
 	return &task, nil
 }
