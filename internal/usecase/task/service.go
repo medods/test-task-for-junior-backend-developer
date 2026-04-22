@@ -31,6 +31,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		Recurrence:  normalized.Recurrence,
 	}
 	now := s.now()
 	model.CreatedAt = now
@@ -67,6 +68,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		Recurrence:  normalized.Recurrence,
 		UpdatedAt:   s.now(),
 	}
 
@@ -105,6 +107,9 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 	if !input.Status.Valid() {
 		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
+	if err := validateRecurrence(input.Recurrence); err != nil {
+		return CreateInput{}, err
+	}
 
 	return input, nil
 }
@@ -120,6 +125,32 @@ func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 	if !input.Status.Valid() {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
+	if err := validateRecurrence(input.Recurrence); err != nil {
+		return UpdateInput{}, err
+	}
 
 	return input, nil
+}
+
+func validateRecurrence(rec *taskdomain.Recurrence) error {
+	if rec == nil {
+		return nil
+	}
+	switch rec.Type {
+	case taskdomain.RecurrenceDaily:
+		if rec.Interval == nil || *rec.Interval <= 0 || *rec.Interval > 365 {
+			return fmt.Errorf("%w: Интервал может быть только от 1 до 365", ErrInvalidInput)
+		}
+	case taskdomain.RecurrenceMonthly:
+		if rec.DayOfMonth == nil || *rec.DayOfMonth <= 0 || *rec.DayOfMonth > 31 {
+			return fmt.Errorf("%w: День месяца может быть только от 1 до 31", ErrInvalidInput)
+		}
+	case taskdomain.RecurrenceSpecificDates:
+		if len(rec.SpecificDates) == 0 {
+			return fmt.Errorf("%w: Для типа specific_dates должен быть указан хотя бы один день", ErrInvalidInput)
+		}
+	default:
+		return fmt.Errorf("%w: Неверный тип повторения", ErrInvalidInput)
+	}
+	return nil
 }
