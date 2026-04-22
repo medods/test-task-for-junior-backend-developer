@@ -169,6 +169,25 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "periodicity": {
+            "type": "object",
+            "properties": {
+              "rrule": {
+                "type": "string",
+                "example": "FREQ=DAILY;INTERVAL=2"
+              },
+              "exdates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date" },
+                "example": ["2026-04-25", "2026-04-26"]
+              },
+              "rdates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date" },
+                "example": ["2026-04-27"]
+              }
+            }
           }
         }
       },
@@ -188,6 +207,25 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          },
+          "periodicity": {
+            "type": "object",
+            "properties": {
+              "rrule": {
+                "type": "string",
+                "example": "FREQ=WEEKLY;BYDAY=MO,WE,FR"
+              },
+              "exdates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date" },
+                "example": ["2026-05-01"]
+              },
+              "rdates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date" },
+                "example": ["2026-05-02"]
+              }
+            }
           }
         }
       },
@@ -214,6 +252,25 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-03-24T00:00:00Z"
+          },
+          "periodicity": {
+            "type": "object",
+            "properties": {
+              "rrule": {
+                "type": "string",
+                "example": "FREQ=MONTHLY;BYMONTHDAY=15"
+              },
+              "exdates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date" },
+                "example": ["2026-06-01"]
+              },
+              "rdates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date" },
+                "example": ["2026-06-15"]
+              }
+            }
           }
         }
       },

@@ -31,10 +31,14 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		Periodicity: normalized.Periodicity, // поддержка периодичности
 	}
 	now := s.now()
 	model.CreatedAt = now
 	model.UpdatedAt = now
+	if normalized.Periodicity != nil {
+		model.LastRunAt = &now
+	}
 
 	created, err := s.repo.Create(ctx, model)
 	if err != nil {
@@ -68,6 +72,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		Description: normalized.Description,
 		Status:      normalized.Status,
 		UpdatedAt:   s.now(),
+		Periodicity: normalized.Periodicity, // поддержка периодичности
 	}
 
 	updated, err := s.repo.Update(ctx, model)

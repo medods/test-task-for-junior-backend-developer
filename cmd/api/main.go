@@ -16,6 +16,8 @@ import (
 	swaggerdocs "example.com/taskservice/internal/transport/http/docs"
 	httphandlers "example.com/taskservice/internal/transport/http/handlers"
 	"example.com/taskservice/internal/usecase/task"
+	worker "example.com/taskservice/internal/worker"
+	//scheduler "example.com/taskservice/internal/usecase/task/scheduler"
 )
 
 func main() {
@@ -40,6 +42,11 @@ func main() {
 	taskHandler := httphandlers.NewTaskHandler(taskUsecase)
 	docsHandler := swaggerdocs.NewHandler()
 	router := transporthttp.NewRouter(taskHandler, docsHandler)
+
+	createInstanceUC := task.NewCreateInstanceUseCase(taskRepo)
+    processRecurringUC := task.NewProcessRecurringTasksUseCase(taskRepo, createInstanceUC)
+	periodicWorker := worker.NewPeriodicWorker(processRecurringUC, 1*time.Minute)
+    go periodicWorker.Start(context.Background())
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

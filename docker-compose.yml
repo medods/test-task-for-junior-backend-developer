@@ -15,7 +15,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations/0001_create_tasks.up.sql:/docker-entrypoint-initdb.d/001_create_tasks.sql:ro
-
+      - ./migrations/0002_add_periodicity_to_tasks.up.sql:/docker-entrypoint-initdb.d/002_add_periodicity.sql:ro
+      - ./migrations/0003_add_scheduled_for_to_tasks.up.sql:/docker-entrypoint-initdb.d/003_create_task_schedule.sql:ro
+      - ./migrations/0004_add_parent_id_and_indexes.up.sql:/docker-entrypoint-initdb.d/004_add_parent_id.sql:ro
+      - ./migrations/0005_add_last_run_at.up.sql:/docker-entrypoint-initdb.d/005_add_last_run.sql:ro
+      - ./migrations/0006_add_unique_constraint.up.sql:/docker-entrypoint-initdb.d/006_add_unique_constaint.sql:ro
   app:
     build:
       context: .
