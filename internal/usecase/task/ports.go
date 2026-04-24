@@ -26,10 +26,12 @@ type CreateInput struct {
 	Title       string
 	Description string
 	Status      taskdomain.Status
+	Period      *taskdomain.Period
 }
 
 type UpdateInput struct {
 	Title       string
 	Description string
 	Status      taskdomain.Status
+	Period      *taskdomain.Period
 }

@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -27,12 +28,14 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		return nil, err
 	}
 
-	model := &taskdomain.Task{
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
-	}
 	now := s.now()
+	model := &taskdomain.Task{
+		Title:          normalized.Title,
+		Description:    normalized.Description,
+		Status:         normalized.Status,
+		Period:         normalized.Period,
+		PeriodAnchorAt: periodAnchor(normalized.Period, now),
+	}
 	model.CreatedAt = now
 	model.UpdatedAt = now
 
@@ -41,7 +44,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		return nil, err
 	}
 
-	return created, nil
+	return s.enrichTask(created), nil
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (*taskdomain.Task, error) {
@@ -49,7 +52,12 @@ func (s *Service) GetByID(ctx context.Context, id int64) (*taskdomain.Task, erro
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
 	}
 
-	return s.repo.GetByID(ctx, id)
+	task, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.enrichTask(task), nil
 }
 
 func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*taskdomain.Task, error) {
@@ -57,17 +65,25 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
 	}
 
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
 	normalized, err := validateUpdateInput(input)
 	if err != nil {
 		return nil, err
 	}
 
+	now := s.now()
 	model := &taskdomain.Task{
-		ID:          id,
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
-		UpdatedAt:   s.now(),
+		ID:             id,
+		Title:          normalized.Title,
+		Description:    normalized.Description,
+		Status:         normalized.Status,
+		Period:         normalized.Period,
+		UpdatedAt:      now,
+		PeriodAnchorAt: resolvePeriodAnchor(existing, normalized.Period, now),
 	}
 
 	updated, err := s.repo.Update(ctx, model)
@@ -75,7 +91,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		return nil, err
 	}
 
-	return updated, nil
+	return s.enrichTask(updated), nil
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
@@ -87,7 +103,16 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 }
 
 func (s *Service) List(ctx context.Context) ([]taskdomain.Task, error) {
-	return s.repo.List(ctx)
+	tasks, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range tasks {
+		s.enrichTask(&tasks[i])
+	}
+
+	return tasks, nil
 }
 
 func validateCreateInput(input CreateInput) (CreateInput, error) {
@@ -106,6 +131,12 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
+	normalizedPeriod, err := normalizePeriod(input.Period)
+	if err != nil {
+		return CreateInput{}, fmt.Errorf("%w: invalid period", ErrInvalidInput)
+	}
+	input.Period = normalizedPeriod
+
 	return input, nil
 }
 
@@ -121,5 +152,66 @@ func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
+	normalizedPeriod, err := normalizePeriod(input.Period)
+	if err != nil {
+		return UpdateInput{}, fmt.Errorf("%w: invalid period", ErrInvalidInput)
+	}
+	input.Period = normalizedPeriod
+
 	return input, nil
+}
+
+func normalizePeriod(period *taskdomain.Period) (*taskdomain.Period, error) {
+	normalized, err := period.Normalize()
+	if err != nil {
+		return nil, err
+	}
+
+	return normalized, nil
+}
+
+func periodAnchor(period *taskdomain.Period, now time.Time) *time.Time {
+	if period == nil {
+		return nil
+	}
+
+	value := now.UTC()
+	return &value
+}
+
+func resolvePeriodAnchor(existing *taskdomain.Task, period *taskdomain.Period, now time.Time) *time.Time {
+	if period == nil {
+		return nil
+	}
+
+	if existing != nil && reflect.DeepEqual(existing.Period, period) {
+		if existing.PeriodAnchorAt != nil {
+			value := existing.PeriodAnchorAt.UTC()
+			return &value
+		}
+
+		value := existing.CreatedAt.UTC()
+		return &value
+	}
+
+	return periodAnchor(period, now)
+}
+
+func (s *Service) enrichTask(task *taskdomain.Task) *taskdomain.Task {
+	if task == nil {
+		return nil
+	}
+
+	if task.Period == nil {
+		task.ScheduledDate = nil
+		return task
+	}
+
+	anchor := task.CreatedAt
+	if task.PeriodAnchorAt != nil {
+		anchor = *task.PeriodAnchorAt
+	}
+	task.ScheduledDate = task.Period.NextScheduledDate(s.now(), anchor)
+
+	return task
 }
