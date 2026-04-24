@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Task Service API",
-    "version": "1.0.0",
-    "description": "CRUD API for tasks built with clean architecture."
+    "version": "1.1.0",
+    "description": "CRUD API for tasks with recurrence support."
   },
   "servers": [
     {
@@ -28,7 +28,9 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/Task" }
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
                 }
               }
             }
@@ -42,7 +44,9 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateTaskRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskRequest"
+              }
             }
           }
         },
@@ -51,11 +55,15 @@
             "description": "Created task",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Task" }
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
         }
       }
     },
@@ -68,7 +76,11 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
           }
         ],
         "responses": {
@@ -76,11 +88,15 @@
             "description": "Task",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Task" }
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
               }
             }
           },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       },
       "put": {
@@ -91,14 +107,20 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/UpdateTaskRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskRequest"
+              }
             }
           }
         },
@@ -107,12 +129,18 @@
             "description": "Updated task",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Task" }
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       },
       "delete": {
@@ -123,12 +151,20 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
           }
         ],
         "responses": {
-          "204": { "description": "Deleted" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       }
     }
@@ -139,7 +175,9 @@
         "description": "Bad request",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" }
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
           }
         }
       },
@@ -147,7 +185,9 @@
         "description": "Resource not found",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" }
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
           }
         }
       }
@@ -159,16 +199,19 @@
         "properties": {
           "title": {
             "type": "string",
-            "example": "Prepare release"
+            "example": "Call patients"
           },
           "description": {
             "type": "string",
-            "example": "Collect release notes and check migrations"
+            "example": "Daily reminder calls after discharge"
           },
           "status": {
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "period": {
+            "$ref": "#/components/schemas/Period"
           }
         }
       },
@@ -178,49 +221,112 @@
         "properties": {
           "title": {
             "type": "string",
-            "example": "Prepare release"
+            "example": "Call patients"
           },
           "description": {
             "type": "string",
-            "example": "Collect release notes and check migrations"
+            "example": "Daily reminder calls after discharge"
           },
           "status": {
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          },
+          "period": {
+            "$ref": "#/components/schemas/Period"
           }
         }
       },
       "Task": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer", "format": "int64", "example": 1 },
-          "title": { "type": "string", "example": "Prepare release" },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "example": "Call patients"
+          },
           "description": {
             "type": "string",
-            "example": "Collect release notes and check migrations"
+            "example": "Daily reminder calls after discharge"
           },
           "status": {
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
           },
+          "period": {
+            "$ref": "#/components/schemas/Period"
+          },
+          "scheduled_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "example": "2026-04-25",
+            "description": "Next execution date derived from recurrence settings. Null when recurrence is not configured or all specific dates are in the past."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
+            "example": "2026-04-24T00:00:00Z"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
+            "example": "2026-04-24T00:00:00Z"
           }
         }
+      },
+      "Period": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["daily", "monthly", "specific", "even_odd"],
+            "example": "daily"
+          },
+          "interval_days": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 2,
+            "description": "Used only for type=daily"
+          },
+          "month_day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "example": 15,
+            "description": "Used only for type=monthly"
+          },
+          "specific_dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": ["2026-04-24", "2026-04-28"],
+            "description": "Used only for type=specific"
+          },
+          "even_odd_type": {
+            "type": "string",
+            "enum": ["even", "odd"],
+            "example": "even",
+            "description": "Used only for type=even_odd"
+          }
+        },
+        "description": "Exactly one recurrence strategy should be configured according to the selected type."
       },
       "Error": {
         "type": "object",
         "properties": {
-          "error": { "type": "string", "example": "task not found" }
+          "error": {
+            "type": "string",
+            "example": "invalid task input: invalid period"
+          }
         }
       }
     }
