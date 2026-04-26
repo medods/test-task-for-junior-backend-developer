@@ -112,6 +112,64 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (h *TaskHandler) GetRecurrence(w http.ResponseWriter, r *http.Request) {
+	id, err := getIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	recID, rec, nextAt, err := h.usecase.GetRecurrence(r.Context(), id)
+	if err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, recurrenceToDTO(recID, rec, nextAt))
+}
+
+func (h *TaskHandler) SetRecurrence(w http.ResponseWriter, r *http.Request) {
+	id, err := getIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	var req recurrenceRequestDTO
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	rec, err := recurrenceFromDTO(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.usecase.SetRecurrence(r.Context(), id, rec); err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *TaskHandler) DeleteRecurrence(w http.ResponseWriter, r *http.Request) {
+	id, err := getIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.usecase.DeleteRecurrence(r.Context(), id); err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func getIDFromRequest(r *http.Request) (int64, error) {
 	rawID := mux.Vars(r)["id"]
 	if rawID == "" {
@@ -143,7 +201,7 @@ func decodeJSON(r *http.Request, dst any) error {
 
 func writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, taskdomain.ErrNotFound):
+	case errors.Is(err, taskdomain.ErrNotFound), errors.Is(err, taskdomain.ErrRecurrenceNotFound):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, taskusecase.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err)
