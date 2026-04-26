@@ -123,3 +123,76 @@ func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 
 	return input, nil
 }
+
+func (s *Service) GetRecurrence(ctx context.Context, taskID int64) (int64, taskdomain.Recurrence, time.Time, error) {
+	if taskID <= 0 {
+		return 0, nil, time.Time{}, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
+	}
+
+	task, err := s.repo.GetByID(ctx, taskID)
+	if err != nil {
+		return 0, nil, time.Time{}, err
+	}
+
+	if task.RecurrenceID == nil {
+		return 0, nil, time.Time{}, taskdomain.ErrRecurrenceNotFound
+	}
+
+	rec, nextAt, err := s.repo.GetRecurrence(ctx, *task.RecurrenceID)
+	if err != nil {
+		return 0, nil, time.Time{}, err
+	}
+
+	return *task.RecurrenceID, rec, nextAt, nil
+}
+
+func (s *Service) SetRecurrence(ctx context.Context, taskID int64, rec taskdomain.Recurrence) error {
+	if taskID <= 0 {
+		return fmt.Errorf("%w: id must be positive", ErrInvalidInput)
+	}
+
+	if err := rec.Valid(); err != nil {
+		return fmt.Errorf("%w: %s", ErrInvalidInput, err)
+	}
+
+	task, err := s.repo.GetByID(ctx, taskID)
+	if err != nil {
+		return err
+	}
+
+	nextAt := rec.NextOccurrence(s.now())
+	if nextAt == nil {
+		return fmt.Errorf("%w: recurrence has no future occurrences", ErrInvalidInput)
+	}
+
+	if task.RecurrenceID != nil {
+		if err := s.repo.DeleteRecurrence(ctx, *task.RecurrenceID); err != nil {
+			return err
+		}
+	}
+
+	recurrenceID, err := s.repo.CreateRecurrence(ctx, rec, *nextAt)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.SetTaskRecurrence(ctx, taskID, &recurrenceID)
+}
+
+func (s *Service) DeleteRecurrence(ctx context.Context, taskID int64) error {
+	if taskID <= 0 {
+		return fmt.Errorf("%w: id must be positive", ErrInvalidInput)
+	}
+
+	task, err := s.repo.GetByID(ctx, taskID)
+	if err != nil {
+		return err
+	}
+
+	if task.RecurrenceID == nil {
+		return taskdomain.ErrRecurrenceNotFound
+	}
+
+	return s.repo.DeleteRecurrence(ctx, *task.RecurrenceID)
+}
+
