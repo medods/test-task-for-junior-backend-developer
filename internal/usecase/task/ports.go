@@ -26,10 +26,14 @@ type CreateInput struct {
 	Title       string
 	Description string
 	Status      taskdomain.Status
+	Repeat      taskdomain.RepeatInterval
+	Config      *taskdomain.RepeatConfig
 }
 
 type UpdateInput struct {
 	Title       string
 	Description string
 	Status      taskdomain.Status
+	Repeat      taskdomain.RepeatInterval
+	Config      *taskdomain.RepeatConfig
 }

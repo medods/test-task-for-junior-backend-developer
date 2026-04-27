@@ -169,6 +169,22 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "repeat": {
+            "type": "string",
+            "enum": ["never", "daily", "monthly", "custom", "even_days", "odd_days"],
+            "example": "daily"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "daily_interval": { "type": "integer" },
+              "month_day": { "type": "integer" },
+              "specific_dates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date-time" }
+              }
+            }
           }
         }
       },
@@ -188,6 +204,22 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          },
+          "repeat": {
+            "type": "string",
+            "enum": ["never", "daily", "monthly", "custom", "even_days", "odd_days"],
+            "example": "daily"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "daily_interval": { "type": "integer" },
+              "month_day": { "type": "integer" },
+              "specific_dates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date-time" }
+              }
+            }
           }
         }
       },
@@ -204,6 +236,22 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "repeat": {
+            "type": "string",
+            "enum": ["never", "daily", "monthly", "custom", "even_days", "odd_days"],
+            "example": "never"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "daily_interval": { "type": "integer" },
+              "month_day": { "type": "integer" },
+              "specific_dates": {
+                "type": "array",
+                "items": { "type": "string", "format": "date-time" }
+              }
+            }
           },
           "created_at": {
             "type": "string",

@@ -31,6 +31,8 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Repeat:      req.Repeat,
+		Config:      req.Config,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -73,6 +75,8 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Repeat:      req.Repeat,
+		Config:      req.Config,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
