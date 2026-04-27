@@ -31,6 +31,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		Repeat:      normalized.Repeat,
+		Config:      normalized.Config,
 	}
 	now := s.now()
 	model.CreatedAt = now
@@ -67,6 +69,8 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		Repeat:      normalized.Repeat,
+		Config:      normalized.Config,
 		UpdatedAt:   s.now(),
 	}
 
@@ -106,6 +110,14 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
+	if input.Repeat == "" {
+		input.Repeat = taskdomain.RepeatNever
+	}
+
+	if !input.Repeat.Valid() {
+		return CreateInput{}, fmt.Errorf("%w: invalid repeat type", ErrInvalidInput)
+	}
+
 	return input, nil
 }
 
@@ -119,6 +131,14 @@ func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 
 	if !input.Status.Valid() {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
+	}
+
+	if input.Repeat == "" {
+		input.Repeat = taskdomain.RepeatNever
+	}
+
+	if !input.Repeat.Valid() {
+		return UpdateInput{}, fmt.Errorf("%w: invalid repeat type", ErrInvalidInput)
 	}
 
 	return input, nil
