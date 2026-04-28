@@ -242,3 +242,37 @@ http://localhost:8080/swagger/openapi.json
   }
 }
 ```
+
+## Тесты
+
+В проекте есть unit-тесты для usecase-слоя.
+
+Покрыты:
+
+- date helper-ы:
+  - `dateOnly`
+  - `clampedDateInMonth`
+  - `daysInMonth`
+- recurrence-логика:
+  - normalizing и сортировка `specific_dates`
+  - запрет дублей в `specific_dates`
+  - обязательность `start_date`
+  - генерация дат для `daily`
+  - генерация дат для `monthly`
+  - генерация дат для `specific_dates`
+  - генерация дат для `odd_days` и `even_days`
+- service orchestration:
+  - create для `one_time`
+  - create для `recurring_template`
+  - запрет прямого create для `recurring_instance`
+  - update для `recurring_template`
+  - запрет recurrence-update для `recurring_instance`
+  - запрет смены `mode`
+  - delete для `recurring_template`
+  - sync шаблонов в `List`
+
+## Как запускать тесты
+
+```cmd
+go test ./...
+```
