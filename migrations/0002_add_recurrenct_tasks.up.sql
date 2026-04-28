@@ -49,6 +49,7 @@ ALTER TABLE tasks
             recurrence_day_of_month IS NULL
             OR recurrence_day_of_month BETWEEN 1 AND 30
         ),
+
     ADD CONSTRAINT tasks_source_task_id_not_self
         CHECK (
             source_task_id IS NULL
@@ -69,6 +70,7 @@ ALTER TABLE tasks
         CHECK (
             (
                 mode = 'one_time'
+                AND scheduled_for IS NULL
                 AND source_task_id IS NULL
                 AND recurrence_type IS NULL
                 AND recurrence_interval IS NULL
@@ -110,6 +112,7 @@ ALTER TABLE tasks
                     WHEN 'monthly' THEN
                         recurrence_interval IS NULL
                         AND recurrence_day_of_month IS NOT NULL
+                        AND recurrence_start_date IS NOT NULL
                         AND recurrence_dates IS NULL
 
                     WHEN 'specific_dates' THEN
@@ -121,11 +124,13 @@ ALTER TABLE tasks
                     WHEN 'odd_days' THEN
                         recurrence_interval IS NULL
                         AND recurrence_day_of_month IS NULL
+                        AND recurrence_start_date IS NOT NULL
                         AND recurrence_dates IS NULL
 
                     WHEN 'even_days' THEN
                         recurrence_interval IS NULL
                         AND recurrence_day_of_month IS NULL
+                        AND recurrence_start_date IS NOT NULL
                         AND recurrence_dates IS NULL
 
                     ELSE false
@@ -137,6 +142,9 @@ CREATE UNIQUE INDEX ux_tasks_recurring_instance_source_task_id_scheduled_for
     ON tasks (source_task_id, scheduled_for)
     WHERE mode = 'recurring_instance';
 
+CREATE INDEX idx_tasks_mode
+    ON tasks (mode);
+
 CREATE INDEX idx_tasks_scheduled_for
     ON tasks (scheduled_for)
     WHERE scheduled_for IS NOT NULL;
@@ -144,3 +152,7 @@ CREATE INDEX idx_tasks_scheduled_for
 CREATE INDEX idx_tasks_source_task_id
     ON tasks (source_task_id)
     WHERE source_task_id IS NOT NULL;
+
+CREATE INDEX idx_tasks_recurrence_type
+    ON tasks (recurrence_type)
+    WHERE recurrence_type IS NOT NULL;

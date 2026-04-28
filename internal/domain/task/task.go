@@ -13,7 +13,7 @@ const (
 )
 
 const (
-	KindOneTime           Mode = "one_time"
+	ModeOneTime           Mode = "one_time"
 	ModeRecurringTemplate Mode = "recurring_template"
 	ModeRecurringInstance Mode = "recurring_instance"
 )
@@ -58,7 +58,7 @@ func (s Status) Valid() bool {
 
 func (m Mode) Valid() bool {
 	switch m {
-	case KindOneTime, ModeRecurringTemplate, ModeRecurringInstance:
+	case ModeOneTime, ModeRecurringTemplate, ModeRecurringInstance:
 		return true
 	default:
 		return false
