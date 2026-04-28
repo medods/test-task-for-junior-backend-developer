@@ -21,17 +21,19 @@ func NewTaskHandler(usecase taskusecase.Usecase) *TaskHandler {
 }
 
 func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req taskMutationDTO
+	var req taskCreateDTO
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
-	})
+	input, err := req.toCreateInput()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	created, err := h.usecase.Create(r.Context(), input)
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
@@ -63,17 +65,19 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req taskMutationDTO
+	var req taskUpdateDTO
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
-	})
+	input, err := req.toUpdateInput()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	updated, err := h.usecase.Update(r.Context(), id, input)
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
@@ -147,6 +151,8 @@ func writeUsecaseError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, taskusecase.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err)
+	case errors.Is(err, taskdomain.ErrTaskHasGeneratedInstances):
+		writeError(w, http.StatusConflict, err)
 	default:
 		writeError(w, http.StatusInternalServerError, err)
 	}
