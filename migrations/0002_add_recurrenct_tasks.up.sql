@@ -1,3 +1,21 @@
+CREATE FUNCTION tasks_date_array_is_unique_and_not_null(dates DATE[])
+RETURNS BOOLEAN
+LANGUAGE sql
+IMMUTABLE
+STRICT
+AS $$
+    SELECT
+        NOT EXISTS (
+            SELECT 1
+            FROM unnest(dates) AS d(value)
+            WHERE d.value IS NULL
+        )
+        AND cardinality(dates) = (
+            SELECT COUNT(DISTINCT d.value)::int
+            FROM unnest(dates) AS d(value)
+        );
+$$;
+
 ALTER TABLE tasks
     ADD COLUMN mode TEXT NOT NULL DEFAULT 'one_time',
     ADD COLUMN scheduled_for DATE NULL,
@@ -12,7 +30,7 @@ ALTER TABLE tasks
     ADD CONSTRAINT fk_tasks_source_task_id
         FOREIGN KEY (source_task_id)
         REFERENCES tasks(id)
-        ON DELETE CASCADE,
+        ON DELETE RESTRICT,
 
     ADD CONSTRAINT tasks_mode
         CHECK (mode IN ('one_time', 'recurring_template', 'recurring_instance')),
@@ -31,18 +49,26 @@ ALTER TABLE tasks
             recurrence_day_of_month IS NULL
             OR recurrence_day_of_month BETWEEN 1 AND 30
         ),
+    ADD CONSTRAINT tasks_source_task_id_not_self
+        CHECK (
+            source_task_id IS NULL
+            OR source_task_id <> id
+        ),
 
-    ADD CONSTRAINT tasks_recurrence_dates_not_empty
+    ADD CONSTRAINT tasks_recurrence_dates_valid
         CHECK (
             recurrence_dates IS NULL
-            OR cardinality(recurrence_dates) > 0
+            OR (
+                array_ndims(recurrence_dates) = 1
+                AND cardinality(recurrence_dates) > 0
+                AND tasks_date_array_is_unique_and_not_null(recurrence_dates)
+            )
         ),
 
     ADD CONSTRAINT tasks_shape
         CHECK (
             (
                 mode = 'one_time'
-                AND scheduled_for IS NULL
                 AND source_task_id IS NULL
                 AND recurrence_type IS NULL
                 AND recurrence_interval IS NULL
@@ -84,7 +110,6 @@ ALTER TABLE tasks
                     WHEN 'monthly' THEN
                         recurrence_interval IS NULL
                         AND recurrence_day_of_month IS NOT NULL
-                        AND recurrence_start_date IS NOT NULL
                         AND recurrence_dates IS NULL
 
                     WHEN 'specific_dates' THEN
@@ -96,16 +121,26 @@ ALTER TABLE tasks
                     WHEN 'odd_days' THEN
                         recurrence_interval IS NULL
                         AND recurrence_day_of_month IS NULL
-                        AND recurrence_start_date IS NOT NULL
                         AND recurrence_dates IS NULL
 
                     WHEN 'even_days' THEN
                         recurrence_interval IS NULL
                         AND recurrence_day_of_month IS NULL
-                        AND recurrence_start_date IS NOT NULL
                         AND recurrence_dates IS NULL
 
                     ELSE false
                 END
             )
         );
+
+CREATE UNIQUE INDEX ux_tasks_recurring_instance_source_task_id_scheduled_for
+    ON tasks (source_task_id, scheduled_for)
+    WHERE mode = 'recurring_instance';
+
+CREATE INDEX idx_tasks_scheduled_for
+    ON tasks (scheduled_for)
+    WHERE scheduled_for IS NOT NULL;
+
+CREATE INDEX idx_tasks_source_task_id
+    ON tasks (source_task_id)
+    WHERE source_task_id IS NOT NULL;
