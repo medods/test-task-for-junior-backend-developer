@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		Recurrence:  normalized.Recurrence,
 	}
 	now := s.now()
 	model.CreatedAt = now
@@ -67,6 +69,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		Recurrence:  normalized.Recurrence,
 		UpdatedAt:   s.now(),
 	}
 
@@ -106,6 +109,12 @@ func validateCreateInput(input CreateInput) (CreateInput, error) {
 		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
+	recurrence, err := validateRecurrence(input.Recurrence)
+	if err != nil {
+		return CreateInput{}, err
+	}
+	input.Recurrence = recurrence
+
 	return input, nil
 }
 
@@ -121,5 +130,81 @@ func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
 		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
 	}
 
+	recurrence, err := validateRecurrence(input.Recurrence)
+	if err != nil {
+		return UpdateInput{}, err
+	}
+	input.Recurrence = recurrence
+
 	return input, nil
+}
+
+func validateRecurrence(recurrence taskdomain.Recurrence) (taskdomain.Recurrence, error) {
+	// Пустой recurrence в запросе трактуется как отсутствие правил периодичности.
+	if recurrence.Type == "" {
+		recurrence.Type = taskdomain.RecurrenceTypeNone
+	}
+
+	if !recurrence.Type.Valid() {
+		return taskdomain.Recurrence{}, fmt.Errorf("%w: invalid recurrence.type", ErrInvalidInput)
+	}
+
+	switch recurrence.Type {
+	case taskdomain.RecurrenceTypeNone:
+		if recurrence.EveryNDays != nil || recurrence.DayOfMonth != nil || recurrence.Parity != nil || len(recurrence.Dates) > 0 {
+			return taskdomain.Recurrence{}, fmt.Errorf("%w: recurrence fields must be empty for type none", ErrInvalidInput)
+		}
+	case taskdomain.RecurrenceTypeDaily:
+		if recurrence.EveryNDays == nil || *recurrence.EveryNDays < 1 || *recurrence.EveryNDays > 365 {
+			return taskdomain.Recurrence{}, fmt.Errorf("%w: recurrence.every_n_days must be in range 1..365", ErrInvalidInput)
+		}
+		recurrence.DayOfMonth = nil
+		recurrence.Parity = nil
+		recurrence.Dates = nil
+	case taskdomain.RecurrenceTypeMonthly:
+		if recurrence.DayOfMonth == nil || *recurrence.DayOfMonth < 1 || *recurrence.DayOfMonth > 30 {
+			return taskdomain.Recurrence{}, fmt.Errorf("%w: recurrence.day_of_month must be in range 1..30", ErrInvalidInput)
+		}
+		recurrence.EveryNDays = nil
+		recurrence.Parity = nil
+		recurrence.Dates = nil
+	case taskdomain.RecurrenceTypeSpecificDates:
+		if len(recurrence.Dates) == 0 {
+			return taskdomain.Recurrence{}, fmt.Errorf("%w: recurrence.dates must contain at least one date", ErrInvalidInput)
+		}
+
+		// Нормализуем список дат для детерминированного хранения:
+		// удаляем лишние пробелы, валидируем формат, убираем дубликаты и сортируем.
+		uniqueDates := make(map[string]struct{}, len(recurrence.Dates))
+		validatedDates := make([]string, 0, len(recurrence.Dates))
+		for _, rawDate := range recurrence.Dates {
+			date := strings.TrimSpace(rawDate)
+			if date == "" {
+				return taskdomain.Recurrence{}, fmt.Errorf("%w: recurrence.dates contains empty value", ErrInvalidInput)
+			}
+			if _, err := time.Parse("2006-01-02", date); err != nil {
+				return taskdomain.Recurrence{}, fmt.Errorf("%w: recurrence.dates must use YYYY-MM-DD format", ErrInvalidInput)
+			}
+			if _, exists := uniqueDates[date]; !exists {
+				uniqueDates[date] = struct{}{}
+				validatedDates = append(validatedDates, date)
+			}
+		}
+		slices.Sort(validatedDates)
+		recurrence.Dates = validatedDates
+		recurrence.EveryNDays = nil
+		recurrence.DayOfMonth = nil
+		recurrence.Parity = nil
+	case taskdomain.RecurrenceTypeMonthParity:
+		if recurrence.Parity == nil || !recurrence.Parity.Valid() {
+			return taskdomain.Recurrence{}, fmt.Errorf("%w: recurrence.parity must be even or odd", ErrInvalidInput)
+		}
+		recurrence.EveryNDays = nil
+		recurrence.DayOfMonth = nil
+		recurrence.Dates = nil
+	default:
+		return taskdomain.Recurrence{}, fmt.Errorf("%w: unsupported recurrence.type", ErrInvalidInput)
+	}
+
+	return recurrence, nil
 }
