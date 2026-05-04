@@ -6,22 +6,37 @@ import (
 )
 
 func (c RecurrenceConfig) Validate() error {
-	if err := c.validateCommon(); err != nil {
+	commonRules := AndSpec{
+		RequiredTypeSpec{},
+		StartDateRequiredSpec{},
+		EndDateValidSpec{},
+		TimezoneValidSpec{},
+	}
+	if err := commonRules.IsSatisfiedBy(c); err != nil {
 		return err
 	}
 
+	var typeRules Specification
 	switch c.Type {
 	case RecurrenceTypeDaily:
-		return c.validateDaily()
+		typeRules = AndSpec{DailyIntervalSpec{}}
 	case RecurrenceTypeMonthly:
-		return c.validateMonthly()
+		typeRules = AndSpec{
+			MonthlyDayInRangeSpec{},
+			MonthlyOverflowValidSpec{},
+		}
 	case RecurrenceTypeSpecificDates:
-		return c.validateSpecificDates()
+		typeRules = AndSpec{
+			DatesNotEmptySpec{},
+			DatesUniqueSpec{},
+		}
 	case RecurrenceTypeParity:
-		return c.validateParity()
+		typeRules = AndSpec{ParityModeValidSpec{}}
 	default:
 		return ErrUnknownType
 	}
+
+	return typeRules.IsSatisfiedBy(c)
 }
 
 func (c RecurrenceConfig) validateCommon() error {
