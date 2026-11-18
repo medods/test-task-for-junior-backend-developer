@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -27,10 +28,21 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ВАЛИДАЦИЯ ПЕРИОДИЧНОСТИ НА УРОВНЕ HANDLER
+	if err := validateRecurrenceFields(req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:            req.Title,
+		Description:      req.Description,
+		Status:           req.Status,
+		RecurrenceType:   req.RecurrenceType,
+		RecurrenceEveryN: req.RecurrenceEveryN,
+		MonthlyDay:       req.MonthlyDay,
+		SpecificDates:    req.SpecificDates,
+		EvenOdd:          req.EvenOdd,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -38,6 +50,40 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, newTaskDTO(created))
+}
+
+func validateRecurrenceFields(req taskMutationDTO) error {
+	// Если тип не указан, пропускаем (обычная задача)
+	if req.RecurrenceType == "" {
+		return nil
+	}
+
+	switch req.RecurrenceType {
+	case taskdomain.RecurrenceDaily:
+		if req.RecurrenceEveryN == nil || *req.RecurrenceEveryN < 1 {
+			return errors.New("daily recurrence requires recurrence_every_n >= 1")
+		}
+
+	case taskdomain.RecurrenceMonthlyDay:
+		if req.MonthlyDay == nil || *req.MonthlyDay < 1 || *req.MonthlyDay > 30 {
+			return errors.New("monthly_day must be between 1 and 30")
+		}
+
+	case taskdomain.RecurrenceSpecific:
+		if len(req.SpecificDates) == 0 {
+			return errors.New("specific dates list cannot be empty")
+		}
+
+	case taskdomain.RecurrenceEvenOdd:
+		if req.EvenOdd == nil || (*req.EvenOdd != "even" && *req.EvenOdd != "odd") {
+			return errors.New("even_odd must be 'even' or 'odd'")
+		}
+
+	default:
+		return fmt.Errorf("invalid recurrence_type: %s", req.RecurrenceType)
+	}
+
+	return nil
 }
 
 func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
@@ -69,10 +115,39 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Валидация периодичности, если поля переданы
+	if req.RecurrenceType != "" {
+		if err := validateRecurrenceFields(req); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	// Конвертируем string в *string для полей, которые могут быть nil
+	var titlePtr *string
+	if req.Title != "" {
+		titlePtr = &req.Title
+	}
+
+	var descriptionPtr *string
+	if req.Description != "" {
+		descriptionPtr = &req.Description
+	}
+
+	var statusPtr *taskdomain.Status
+	if req.Status != "" {
+		statusPtr = &req.Status
+	}
+
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:            titlePtr,
+		Description:      descriptionPtr,
+		Status:           statusPtr,
+		RecurrenceType:   &req.RecurrenceType,  // RecurrenceType тоже может быть указателем
+		RecurrenceEveryN: req.RecurrenceEveryN, // уже *int,没问题
+		MonthlyDay:       req.MonthlyDay,       // уже *int
+		SpecificDates:    req.SpecificDates,    // []time.Time
+		EvenOdd:          req.EvenOdd,          // уже *string
 	})
 	if err != nil {
 		writeUsecaseError(w, err)

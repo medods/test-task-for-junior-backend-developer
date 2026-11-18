@@ -23,13 +23,23 @@ type Usecase interface {
 }
 
 type CreateInput struct {
-	Title       string
-	Description string
-	Status      taskdomain.Status
+	Title            string
+	Description      string
+	Status           taskdomain.Status
+	RecurrenceType   taskdomain.RecurrenceType `json:"recurrence_type"`
+	RecurrenceEveryN *int                      `json:"recurrence_every_n"`
+	MonthlyDay       *int                      `json:"monthly_day"`
+	SpecificDates    taskdomain.TimeSlice      `json:"specific_dates"`
+	EvenOdd          *string                   `json:"even_odd"`
 }
 
 type UpdateInput struct {
-	Title       string
-	Description string
-	Status      taskdomain.Status
+	Title            *string
+	Description      *string
+	Status           *taskdomain.Status
+	RecurrenceType   *taskdomain.RecurrenceType `json:"recurrence_type"`
+	RecurrenceEveryN *int                       `json:"recurrence_every_n"`
+	MonthlyDay       *int                       `json:"monthly_day"`
+	SpecificDates    taskdomain.TimeSlice       `json:"specific_dates"`
+	EvenOdd          *string                    `json:"even_odd"`
 }
